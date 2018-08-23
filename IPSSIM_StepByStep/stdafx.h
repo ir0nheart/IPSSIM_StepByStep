@@ -18,6 +18,8 @@
 #include <deque>
 #include <fstream>
 #include <string>
+#include <streambuf>
+#include <istream>
 
 
 // TODO: reference additional headers your program requires here

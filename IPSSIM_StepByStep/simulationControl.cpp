@@ -3,6 +3,8 @@
 #include "Timer.h"
 #include "InputFiles.h"
 #include <string>
+#include "Parser.h"
+#include "Storage.h"
 
 
 SimulationControl * SimulationControl::m_pInstance = nullptr;
@@ -75,6 +77,22 @@ void SimulationControl::wConsole(const char* s, WORD color)
 void SimulationControl::run()
 {
 	InputFiles * iFiles = InputFiles::instance(inputDirectory);
-	wConsole("I am running on another thread", BRIGHT_YELLOW); 
+	wConsole("I am running on another thread", BRIGHT_YELLOW);
+	iFiles->checkInputFiles();
+	iFiles->readPropsINP();
+	iFiles->printAllFileInformation();
+
+	Storage * store = Storage::instance();
+
+	Parser * fileParser = Parser::instance(inputDirectory,store);
+	fileParser->mapFile(iFiles->getFilesForReading()["INP"]);
+	fileParser->findDataSetPositionsInMap();
+
+	Timer t;
+	fileParser->extractDataSets();
+	std::cout << "All Data Sets are extracted in " << t << "seconds."<< std::endl;
+	fileParser->unmapFile();
+
+
 
 }

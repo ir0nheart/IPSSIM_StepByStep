@@ -17,6 +17,7 @@ public:
 	void checkInputFiles();
 	void printInputFilesToLST();
 	void readPropsINP();
+	std::unordered_map<std::string, std::string> getFilesForReading();
 private:
 	InputFiles();
 	InputFiles(std::string inputDirectory);

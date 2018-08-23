@@ -6,8 +6,10 @@ InputFiles* InputFiles::m_pInstance = nullptr;
 
 InputFiles* InputFiles::instance()
 {
-	if (m_pInstance == nullptr)
+	if (m_pInstance == nullptr){
+		std::cout << "instance() must be called with input directory first." << std::endl;
 		SimulationControl::exitOnError();
+	}
 	return m_pInstance;
 }
 InputFiles* InputFiles::instance(std::string inputDirectory)
@@ -16,7 +18,10 @@ InputFiles* InputFiles::instance(std::string inputDirectory)
 		m_pInstance = new InputFiles(inputDirectory);
 	return m_pInstance;
 }
-
+std::unordered_map<std::string, std::string> InputFiles::getFilesForReading()
+{
+	return filesToRead;
+}
 InputFiles::InputFiles(std::string inputDirectory) :input_directory(inputDirectory)
 {
 	std::string fname;
@@ -133,7 +138,58 @@ void InputFiles::printAllFileInformation()
 }
 
 
+//Check if all required input files exists in working Directory
+void InputFiles::checkInputFiles()
+{
+	std::unordered_map<std::string, std::string>::iterator it = filesToRead.begin();
+	while (it != filesToRead.end()){
+		std::string str;
+		str.append(input_directory);
+		str.append(it->second);
+		std::ifstream fin(str.c_str());
 
+		if (fin.fail())
+		{
+			
+			std::cout << "Failed: " << std::endl;
+			
+			std::cout << str << std::endl;
+			
+			std::cout << std::setw(80) << std::right << " file is not in the current working directory." << std::endl;
+			SimulationControl::exitOnError();
+		}
+		
+		std::cout << "Success :" << std::endl;
+		
+		std::cout << str << std::endl;
+		
+		std::cout << std::setw(80) << std::right << " file is in the current working directory." << std::endl;
+		it++;
+	}
+}
+
+// Read props.inp file for layer information and simulation time step divide
+void InputFiles::readPropsINP()
+{
+	std::string mline;
+	const char * del = " "; // space delimiter
+	std::string propsFile;
+	propsFile.append(input_directory);
+	propsFile.append("props.inp");
+	std::ifstream propsFileStream;
+
+
+	propsFileStream.open(propsFile.c_str());
+	if (propsFileStream.fail()){ 
+		std::cerr << "Error: " << strerror(errno) << "\n" << std::endl;
+		std::cout << "Please make sure 'props.inp' is in your work directory \n" << std::endl;
+		SimulationControl::exitOnError();
+	}
+	filesToRead["PROPS"] = "props.inp";
+}
+
+
+// Destructor Object
 InputFiles::~InputFiles()
 {
 }
