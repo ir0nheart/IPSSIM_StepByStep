@@ -2,12 +2,17 @@
 #define STORAGE_H
 #pragma once
 #include "DataSet.h"
+#include "Schedule.h"
+#include "Node.h"
+#include "Element.h"
+#include "obsPoint.h"
 
 class Storage
 {
 public:
 	static Storage * instance();
 	void addTittle(std::string str);
+	void check_data_sets();
 	std::string getTittle(int index);
 	void set_sutra_string(std::vector<char> str){ sutra_string = str; }
 	void set_version_string(std::vector<char> str){ version_string = str; }
@@ -105,6 +110,7 @@ public:
 	void add_obsData(std::vector<std::vector<char>> &obs){ obsData.push_back(obs); }
 	void add_nodeData(std::vector<char> &node){ nodeData.push_back(node); }
 	void add_elementData(std::vector<char> &element){ elementData.push_back(element); }
+	void add_layerData(std::vector<char> &layer){ layerData.push_back(layer); }
 	void set_nbcfpr(int val){ NBCFPR = val; }
 	void set_nbcspr(int val){ NBCSPR = val; }
 	void set_nbcppr(int val){ NBCPPR = val; }
@@ -134,8 +140,8 @@ public:
 	void set_gravy(double gravy){ GRAVY = gravy; }
 	void set_gravz(double gravz){ GRAVZ = gravz; }
 	void set_scalx(double scalx){ SCALX = scalx; }
-	void set_scaly(double scaly){ SCALX = scaly; }
-	void set_scalz(double scalz){ SCALX = scalz; }
+	void set_scaly(double scaly){ SCALY = scaly; }
+	void set_scalz(double scalz){ SCALZ = scalz; }
 	void set_porfac(double porfac){ PORFAC=porfac; }
 	double get_compfl() const;
 	double get_cw() const;
@@ -173,11 +179,30 @@ public:
 	void add_npbc_data(std::vector<char> &str){ npbcData.push_back(str); }
 	void add_nubc_data(std::vector<char> &str){ nubcData.push_back(str); }
 
-
-
-
-
-
+	void set_nn1(int val){ NN1 = val; }
+	void set_nn2(int val){ NN2 = val; }
+	void set_nn3(int val){ NN3 = val; }
+	int get_nn1() const;
+	int get_nn2() const;
+	int get_nn3() const;
+	void set_pstar(double val){ PSTAR = val; }
+	void set_gconst(double val){GCONST = val; }
+	void set_temp(double val){ TEMP= val; }
+	void set_smwh(double val){ SMWH = val; }
+	void set_water_table(double val){ water_table = val; }
+	void set_time_step_divide(double val){ time_step_divide = val; }
+	void set_number_of_layers(int val){ number_of_layers = val; }
+	void add_p_ics(double val){ p_ics.push_back(val); }
+	void add_u_ics(double val){ u_ics.push_back(val); }
+	void set_t_ics(double val){ t_ics = val; }
+	void set_p_ics_string(std::vector<char> str){ p_ics_string = str; }
+	void set_u_ics_string(std::vector<char> str){ u_ics_string = str; }
+	void reserve_p_ics(){ p_ics.reserve(NN); };
+	void reserve_u_ics(){ u_ics.reserve(NN); };
+	int FRCSTP(double time);
+	int FINDL3(int el_no,obsPoint& obs,double& xsi_,double& eta_,double& zet_);
+	void PTRSET();
+	void BANWID();
 private:
 	static Storage * m_pInstance;
 	std::unordered_map<std::string, DataSet *> dataSetMap;
@@ -208,13 +233,22 @@ private:
 	std::vector<std::vector<char>> nodeData;
 	std::vector<std::vector<char>> elementData;
 	std::vector<std::vector<char>> incidenceData;
+	std::vector<std::vector<char>> layerData;
 	std::vector<std::vector<char>> nsopData;
 	std::vector<std::vector<char>> nsouData;
 	std::vector<std::vector<char>> npbcData;
 	std::vector<std::vector<char>> nubcData;
+	std::vector<double> p_ics;
+	std::vector<double> u_ics;
+	std::vector<char> p_ics_string;
+	std::vector<char> u_ics_string;
+
+	std::vector<Schedule *> schedule_list;
+	double t_ics;
 	int solution_storage;
 	int NN, NE, NSOP, NSOU, NPBC, NUBC,NOBS;
 	int NSCH, NPCYC, NUCYC;
+	int NN1, NN2, NN3;
 	int ITRMAX, RPMAX, RUMAX;
 	int max_p_iterations;
 	int max_u_iterations;
@@ -223,6 +257,9 @@ private:
 	int element_output_every;
 	int observation_first_line;
 	int NBCFPR, NBCSPR, NBCPPR, NBCUPR;
+	int number_of_layers;
+	int NOBCYC;
+	
 	char CINACT;
 	double u_tolerance;
 	double p_tolerance;
@@ -253,6 +290,87 @@ private:
 	double SCALY;
 	double SCALZ;
 	double PORFAC;
+	double PSTAR;
+	double GCONST;
+	double TEMP;
+	double SMWH;
+	double time_step_divide;
+	double water_table;
+	int ME; // -1 For Solute , + 1 for ENERGY
+	int IUNSAT;
+	int ISSFLO;
+	int ISSTRA;
+	int IREAD;
+	int NSCHAU;
+	int time_steps_index;
+	int NSAVEP;
+	int NSAVEU;
+	int NBCN;
+	int NOBSN;
+	int N48;
+	int NEX;
+	int NIN;
+	int KNODAL;
+	int KELMNT;
+	int KINCID;
+	int KPANDS;
+	int KVEL;
+	int KCORT;
+	int KBUDG;
+	int KSCRN;
+	int KPAUSE;
+	int NSOPI;
+	int NSOUI;
+	int IQSOPT;
+	int IQSOUT;
+	double TSTART;
+	double DELT;
+	double CHI1;
+	double CHI2;
+	double PMAXFA;
+	double PMIDFA;
+	double PMINFA;
+	double ANG1FA;
+	double ANG2FA;
+	double ANG3FA;
+	double ALMAXF;
+	double ALMIDF;
+	double ALMINF;
+	double ATMXF;
+	double ATMDF;
+	double ATMNF;
+	double D2R;
+	double GNUP1;
+	double GNUU1;
+	int IBCUBC;
+	int IBCPBC;
+	std::vector<int> IQSOP;
+	std::vector<int> IQSOU;
+	std::vector<int>IPBC;
+	std::vector<int>IUBC;
+	int IPBCT;
+	int IUBCT;
+	int ITMAX;
+	int NDIMJA;
+	int NELT;
+	std::vector<bool> BCSFL;
+	std::vector<bool> BCSTR;
+	std::vector<int> KTYPE; // KTYPE[0] for MESH TYPE 2D = 2, 3D=3  --- KTYPE[1] for MESH TYPE IRREGULAR=0,LAYERED=1,REGULAR=2,BLOCKWISE =3
+	std::vector<Node> nodeContainer;
+	std::vector<Element> elementContainer;
+	std::vector<obsPoint> obsContainer;
+	std::vector < std::pair<int, std::vector<int>>> incidenceContainer;
+	std::vector <int> incidence_vector;
+	std::vector<int> IA;
+	std::vector<int> JA;
+	int NB;
+	int NBHALF;
+	int NBI;
+	int max_bandwidth_element;
+	int ITRST;
+	double DELTP;
+	double DELTU;
+	double TSEC;
 	Storage();
 	~Storage();
 };

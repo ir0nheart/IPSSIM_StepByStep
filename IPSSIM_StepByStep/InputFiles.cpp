@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "InputFiles.h"
 #include "simulationControl.h"
+#include "Storage.h"
 
 InputFiles* InputFiles::m_pInstance = nullptr;
 
@@ -22,6 +23,12 @@ std::unordered_map<std::string, std::string> InputFiles::getFilesForReading()
 {
 	return filesToRead;
 }
+
+std::unordered_map<std::string, std::string> InputFiles::getFilesForWriting()
+{
+	return filesToWrite;
+}
+
 InputFiles::InputFiles(std::string inputDirectory) :input_directory(inputDirectory)
 {
 	std::string fname;
@@ -186,6 +193,31 @@ void InputFiles::readPropsINP()
 		SimulationControl::exitOnError();
 	}
 	filesToRead["PROPS"] = "props.inp";
+	std::getline(propsFileStream, mline);
+	std::getline(propsFileStream, mline);
+	std::vector<char> lineBuffer(mline.begin(), mline.end());
+	lineBuffer.push_back('\0');
+	Storage::instance()->set_pstar(std::stod(strtok(lineBuffer.data(), " ")));
+	Storage::instance()->set_gconst(std::stod(strtok(NULL, " ")));
+	Storage::instance()->set_temp(std::stod(strtok(NULL, " ")));
+	Storage::instance()->set_smwh(std::stod(strtok(NULL, " ")));
+	Storage::instance()->set_time_step_divide(std::stod(strtok(NULL, " ")));
+	Storage::instance()->set_water_table(std::stod(strtok(NULL, " ")));
+	std::getline(propsFileStream, mline);
+	std::getline(propsFileStream, mline);
+	lineBuffer.assign(mline.begin(), mline.end());
+	lineBuffer.push_back('\0');
+	int noLayers = std::stoi(strtok(lineBuffer.data(), " "));
+	Storage::instance()->set_number_of_layers(noLayers);
+	std::getline(propsFileStream, mline);
+	for (int i = 0; i < noLayers; i++)
+	{
+		std::getline(propsFileStream, mline);
+		lineBuffer.assign(mline.begin(), mline.end());
+		lineBuffer.push_back('\0');
+		Storage::instance()->add_layerData(lineBuffer);
+	}
+
 }
 
 

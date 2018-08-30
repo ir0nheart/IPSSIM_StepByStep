@@ -8,6 +8,7 @@ public:
 	static SimulationControl * instance();
 	static void wConsole(const char* s, WORD color);
 	static void exitOnError();
+	static void exitOnError(std::string errcod);
 private:
 	static SimulationControl * m_pInstance;
 	std::string inputDirectory;

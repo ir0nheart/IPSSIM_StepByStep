@@ -539,7 +539,6 @@ void Parser::parseDataSet_6()
 	storage->set_nsch(convertInt(parsed_strings[0]));
 	storage->set_npcyc(convertInt(parsed_strings[1]));
 	storage->set_nucyc(convertInt(parsed_strings[2]));
-
 	for (int i = 1; i < lines.size()-1; i++)
 	{
 		storage->add_temporal_control(lines[i]);
@@ -862,6 +861,7 @@ void Parser::parseDataSet_8D()
 				parsed_strings[it].push_back(c);
 			if (c == ' ')
 				it++;
+			
 		}
 
 		storage->add_obsData(parsed_strings);
@@ -1152,7 +1152,6 @@ void Parser::parseDataSet_15A()
 	}
 
 	storage->set_element_props(parsed_strings);
-
 }
 
 void Parser::parseDataSet_15B()
@@ -1414,21 +1413,123 @@ int Parser::convertInt(std::vector<char> cInt)
 				val = val + b * pow(10, cSize);
 				cSize--;
 			}
+		} else if (cSize == 1)
+		{
+			val = cInt[0] - '0';
 		} else
 		{
 			if (cInt[0] == '-')
 				mult = -1;
-			cSize-=2;
-			for (int i = 1; i < cInt.size();i++)
+
+			cSize -= 2;
+			for (int i = 1; i < cInt.size(); i++)
 			{
 				int b = cInt[i] - '0';
 				val = val + b * pow(10, cSize);
-				val = mult*val;
 				cSize--;
 			}
+			val = mult*val;
 		}
 	} 
 	return val;		
+}
+void Parser::extractICS()
+{ // For Cold only
+	std::vector<char> line;
+	std::vector<std::vector<char>> lines;
+
+	int size = strlen(mapViewOfFile);
+	//lines.reserve(storage->get_nsou());
+	storage->reserve_p_ics();
+	storage->reserve_u_ics();
+	int start_index = 0;
+	char * str_start = mapViewOfFile + start_index;
+	char * str_end;
+	for (int i =0; i < size; i++){
+		if (mapViewOfFile[i] == '\r'){
+			str_end = mapViewOfFile + i;
+			line.assign(str_start, str_end);
+			storage->set_t_ics(std::stod(line.data()));
+			start_index = i + 2;
+			str_start = mapViewOfFile + start_index;
+			break;
+		}
+	}
+
+	for (int i = start_index; i <size; i++){
+		if (mapViewOfFile[i] == '\r'){
+			str_end = mapViewOfFile + i;
+			line.assign(str_start, str_end);
+			start_index = i + 2;
+			str_start = mapViewOfFile + start_index;
+			break;
+		}
+	}
+	for (int i = start_index; i <size; i++){
+		if (mapViewOfFile[i] == '\r'){
+			str_end = mapViewOfFile + i;
+			line.assign(str_start, str_end);
+			storage->set_p_ics_string(line);
+			start_index = i + 2;
+			str_start = mapViewOfFile + start_index;
+			break;
+		}
+	}
+
+	int addedData = 0;
+	int NN = storage->get_nn();
+	for (int i = start_index; i <size; i++){
+		if (mapViewOfFile[i] == '\r'){
+			str_end = mapViewOfFile + i;
+			line.assign(str_start, str_end);
+			storage->add_p_ics(std::stod(line.data()));
+			addedData++;
+			start_index = i + 2;
+			str_start = mapViewOfFile + start_index;
+			if (addedData == NN){
+				addedData = 0;
+				break;
+			}
+		}
+	}
+	for (int i = start_index; i <size; i++){
+		if (mapViewOfFile[i] == '\r'){
+			str_end = mapViewOfFile + i;
+			line.assign(str_start, str_end);
+			start_index = i + 2;
+			str_start = mapViewOfFile + start_index;
+			break;
+		}
+	}
+	for (int i = start_index; i <size; i++){
+		if (mapViewOfFile[i] == '\r'){
+			str_end = mapViewOfFile + i;
+			line.assign(str_start, str_end);
+			storage->set_u_ics_string(line);
+			start_index = i + 2;
+			str_start = mapViewOfFile + start_index;
+			break;
+		}
+	}
+
+	
+	for (int i = start_index; i <size; i++){
+		if (mapViewOfFile[i] == '\r'){
+			str_end = mapViewOfFile + i;
+			line.assign(str_start, str_end);
+			storage->add_u_ics(std::stod(line.data()));
+			addedData++;
+			start_index = i + 2;
+			str_start = mapViewOfFile + start_index;
+			if (addedData == NN){
+				addedData = 0;
+				break;
+			}
+		}
+	}
+
+
+
 }
 Parser::~Parser()
 {
