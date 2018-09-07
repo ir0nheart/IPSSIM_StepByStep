@@ -2,6 +2,7 @@
 #include "Storage.h"
 #include "SimulationControl.h"
 #include "obsPoint.h"
+#include "Timer.h"
 
 Storage * Storage::m_pInstance = nullptr;
 
@@ -1601,7 +1602,9 @@ void Storage::check_data_sets()
 	if (strncmp(p_solver_string.data(),"DIRECT",p_solver_string.size()))
 	{
 		NDIMJA = NN + 1;
+		Timer t;
 		PTRSET();
+		std::cout << "PTR Set done in " << t << " seconds." << std::endl;
 	}
 
 	BANWID();
