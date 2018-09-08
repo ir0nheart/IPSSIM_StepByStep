@@ -1938,3 +1938,73 @@ void Storage::TENSYM(double& pmax,double& pmid,double& pmin,std::vector<double>&
 	permzx = permxz;
 	permzy = permyz;
 }
+
+void Storage::determine_tmax()
+{
+	if (ISSTRA == 0)
+	{
+		TMAX = schedule_list[time_steps_index]->get_max_time();
+	}
+	else
+	{
+		TMAX = TSTART;
+	}
+	TEMAX = TMAX - TSTART;
+}
+
+void Storage::check_restart()
+{
+	IT = ITRST;
+	ITBCS = IT;
+	DIT = (double)IT;
+	if (IT == 0)
+	{
+		DELTLC = DELT;
+	}
+	else
+	{
+		std::cout << "Restart condition is not implemented in IPSSIM yet." << std::endl;
+		SimulationControl::exitOnError();
+	}
+}
+
+void Storage::set_flags()
+{
+	ONCEP = false;
+	SETBCS = true;
+	IBCT = IQSOPT + IQSOUT + IPBCT + IUBCT;
+	
+}
+
+void Storage::set_starting_time()
+{
+	TSECP0 = TSEC;
+	TSECU0 = TSEC;
+	TMIN = TSEC / 60;
+	THOUR = TMIN / 60;
+	TDAY = THOUR / 24;
+	TWEEK = TDAY / 7;
+	TMONTH = TDAY / 30.4375;
+	TYEAR = TDAY / 365.25;
+}
+
+void Storage::output_initial_starting_if_transient()
+{
+	if (ISSTRA != 1)
+	{
+		if (KTYPE[0] == 3)
+		{
+			
+		}
+		else
+		{
+			
+		}
+
+
+		if (ISSFLO == 0)
+		{
+			
+		}
+	}
+}

@@ -118,5 +118,9 @@ void SimulationControl::run()
 
 	// HERE SUTRA STARTS
 	std::cout << "FAST Check " << std::endl;
-	
+
+	store->determine_tmax();
+	store->set_flags();
+	store->set_starting_time();
+	store->output_initial_starting_if_transient();
 }

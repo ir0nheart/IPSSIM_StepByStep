@@ -11,6 +11,9 @@ class Storage
 {
 public:
 	static Storage * instance();
+	void output_initial_starting_if_transient();
+	void determine_tmax();
+	void check_restart();
 	void addTittle(std::string str);
 	void check_data_sets();
 	std::string getTittle(int index);
@@ -178,7 +181,7 @@ public:
 	void add_nsou_data(std::vector<char> &str){ nsouData.push_back(str); }
 	void add_npbc_data(std::vector<char> &str){ npbcData.push_back(str); }
 	void add_nubc_data(std::vector<char> &str){ nubcData.push_back(str); }
-
+	void set_flags();
 	void set_nn1(int val){ NN1 = val; }
 	void set_nn2(int val){ NN2 = val; }
 	void set_nn3(int val){ NN3 = val; }
@@ -201,6 +204,7 @@ public:
 	void reserve_u_ics(){ u_ics.reserve(NN); };
 	int FRCSTP(double time);
 	int FINDL3(int el_no,obsPoint& obs,double& xsi_,double& eta_,double& zet_);
+	void set_starting_time();
 	void PTRSET();
 	void BANWID();
 	void allocate_element_arrays();
@@ -260,9 +264,11 @@ private:
 	std::vector<double> u_ics;
 
 	std::vector<Schedule *> schedule_list;
+	bool ONCEP;
+	bool SETBCS;
 	char CINACT;
 
-	
+	int IBCT;
 	int solution_storage;
 	int NN, NE, NSOP, NSOU, NPBC, NUBC,NOBS;
 	int NSCH, NPCYC, NUCYC;
@@ -320,6 +326,21 @@ private:
 	int NBI;
 	int max_bandwidth_element;
 	int ITRST;
+	int IT;
+	int ITBCS;
+
+	double TSECP0;
+	double TSECU0;
+	double TMIN;
+	double THOUR;
+	double TDAY;
+	double TWEEK;
+	double TMONTH;
+	double TYEAR;
+	double DIT;
+	double DELTLC;
+	double TMAX;
+	double TEMAX;
 	double DELTP;
 	double DELTU;
 	double TSEC;

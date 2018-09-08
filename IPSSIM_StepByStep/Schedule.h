@@ -20,6 +20,7 @@ public:
 	std::string get_type() const{ return schedule_type; }
 	std::string get_name() const{ return schedule_name; }
 	int get_step_list_size()const { return step_time.size(); }
+	double get_max_time(){ return step_time[step_time.size() - 1].second; }
 private:
 	std::string schedule_name;
 	std::string schedule_type;
