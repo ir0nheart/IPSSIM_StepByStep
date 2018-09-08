@@ -93,6 +93,8 @@ void SimulationControl::wConsole(const char* s, WORD color)
 }
 void SimulationControl::run()
 {
+//	double * p = new double[100]{0};
+
 	InputFiles * iFiles = InputFiles::instance(inputDirectory);
 	wConsole("I am running on another thread", BRIGHT_YELLOW);
 	iFiles->checkInputFiles();
@@ -113,5 +115,8 @@ void SimulationControl::run()
 	fileParser->extractICS();
 	fileParser->unmapFile();
 	store->check_data_sets();
+
+	// HERE SUTRA STARTS
+	std::cout << "FAST Check " << std::endl;
 	
 }

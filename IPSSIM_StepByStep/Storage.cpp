@@ -3,6 +3,7 @@
 #include "SimulationControl.h"
 #include "obsPoint.h"
 #include "Timer.h"
+#include <algorithm>
 
 Storage * Storage::m_pInstance = nullptr;
 
@@ -515,30 +516,30 @@ int Storage::FINDL3(int el_no,obsPoint& obs,double& xsi_,double& eta_,double& ze
 	double detxsi, deteta, detzet,determ;
 	double delxsi, deleta, delzet;
 	int m0 = (el_no - 1) * 8;
-	x1 = nodeContainer[incidence_vector[m0]-1].get_x();
-	x2 = nodeContainer[incidence_vector[m0+1]-1].get_x();
-	x3 = nodeContainer[incidence_vector[m0+2]-1].get_x();
-	x4 = nodeContainer[incidence_vector[m0+3]-1].get_x();
-	x5 = nodeContainer[incidence_vector[m0+4]-1].get_x();
-	x6 = nodeContainer[incidence_vector[m0+5]-1].get_x();
-	x7 = nodeContainer[incidence_vector[m0+6]-1].get_x();
-	x8 = nodeContainer[incidence_vector[m0+7]-1].get_x();
-	y1 = nodeContainer[incidence_vector[m0]-1].get_y();
-	y2 = nodeContainer[incidence_vector[m0 + 1]-1].get_y();
-	y3 = nodeContainer[incidence_vector[m0 + 2]-1].get_y();
-	y4 = nodeContainer[incidence_vector[m0 + 3]-1].get_y();
-	y5 = nodeContainer[incidence_vector[m0 + 4]-1].get_y();
-	y6 = nodeContainer[incidence_vector[m0 + 5]-1].get_y();
-	y7 = nodeContainer[incidence_vector[m0 + 6]-1].get_y();
-	y8 = nodeContainer[incidence_vector[m0 + 7]-1].get_y();
-	z1 = nodeContainer[incidence_vector[m0]-1].get_z();
-	z2 = nodeContainer[incidence_vector[m0 + 1]-1].get_z();
-	z3 = nodeContainer[incidence_vector[m0 + 2]-1].get_z();
-	z4 = nodeContainer[incidence_vector[m0 + 3]-1].get_z();
-	z5 = nodeContainer[incidence_vector[m0 + 4]-1].get_z();
-	z6 = nodeContainer[incidence_vector[m0 + 5]-1].get_z();
-	z7 = nodeContainer[incidence_vector[m0 + 6]-1].get_z();
-	z8 = nodeContainer[incidence_vector[m0 + 7]-1].get_z();
+	x1 = node_x[incidence_vector[m0]-1];
+	x2 = node_x[incidence_vector[m0+1]-1];
+	x3 = node_x[incidence_vector[m0+2]-1];
+	x4 = node_x[incidence_vector[m0+3]-1];
+	x5 = node_x[incidence_vector[m0+4]-1];
+	x6 = node_x[incidence_vector[m0+5]-1];
+	x7 = node_x[incidence_vector[m0+6]-1];
+	x8 = node_x[incidence_vector[m0+7]-1];
+	y1 = node_y[incidence_vector[m0]-1];
+	y2 = node_y[incidence_vector[m0 + 1]-1];
+	y3 = node_y[incidence_vector[m0 + 2]-1];
+	y4 = node_y[incidence_vector[m0 + 3]-1];
+	y5 = node_y[incidence_vector[m0 + 4]-1];
+	y6 = node_y[incidence_vector[m0 + 5]-1];
+	y7 = node_y[incidence_vector[m0 + 6]-1];
+	y8 = node_y[incidence_vector[m0 + 7]-1];
+	z1 = node_z[incidence_vector[m0]-1];
+	z2 = node_z[incidence_vector[m0 + 1]-1];
+	z3 = node_z[incidence_vector[m0 + 2]-1];
+	z4 = node_z[incidence_vector[m0 + 3]-1];
+	z5 = node_z[incidence_vector[m0 + 4]-1];
+	z6 = node_z[incidence_vector[m0 + 5]-1];
+	z7 = node_z[incidence_vector[m0 + 6]-1];
+	z8 = node_z[incidence_vector[m0 + 7]-1];
 
 
 	ax = +x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8;
@@ -634,35 +635,36 @@ void Storage::PTRSET()
 			for (int t = 0; t < N48; t++)
 			{
 				neighbor_ = incidenceContainer[j].second[t];
-				if (neighbor_ == nod_)
+				if (neighbor_ != nod_)
 				{
-					continue;
-				} else
-				{
-					nodeContainer[nod_ - 1].add_neighbor(neighbor_);
+				//	nodeContainer[nod_ - 1].add_neighbor(neighbor_);
+					node_neighbors[nod_ - 1].push_back(neighbor_);
 				}
 			}
 		}
 		
 	}
 	NELT = 0;
-	for (int i = 0; i < nodeContainer.size(); i++)
+	for (int i = 0; i < NN; i++)
 	{
-		nodeContainer[i].make_neighbors_unique();
-		NELT += nodeContainer[i].get_neighbor_size();
+		//nodeContainer[i].make_neighbors_unique();
+		sort(node_neighbors[i].begin(), node_neighbors[i].end());
+		node_neighbors[i].erase(std::unique(node_neighbors[i].begin(), node_neighbors[i].end()), node_neighbors[i].end());
+		//NELT += nodeContainer[i].get_neighbor_size();
+		NELT += node_neighbors[i].size();
 	}
 	NELT = NELT + NN;
 
 	IA.reserve(NELT);
 	JA.reserve(NDIMJA);
 
-	for (int i = 0; i < nodeContainer.size(); i++)
+	for (int i = 0; i < NN; i++)
 	{
 		JA.push_back(IA.size());
-		IA.push_back(i + 1);
-		for (int k = 0; k < nodeContainer[i].get_neighbor_size(); k++)
+		IA.push_back(i); // it was i+1
+		for (int k = 0; k < node_neighbors[i].size(); k++)
 		{
-			IA.push_back(nodeContainer[i].get_neighbor(k));
+			IA.push_back(node_neighbors[i][k] -1);
 		}
 	}
 	JA.push_back(NELT);
@@ -1135,6 +1137,7 @@ void Storage::check_data_sets()
 	tstart_ = TREF + step_time[0].second;
 	tfinish_ = TREF + step_time[ITMAX].second;
 	delt_ = step_time[1].second - step_time[0].second;
+	DELT = delt_;
 	for (int j = 0; j < NSMAX; j++)
 	{
 		if (j >0)
@@ -1236,41 +1239,53 @@ void Storage::check_data_sets()
 
 	// Create Nodes
 	nodeContainer.reserve(NN);
+	allocate_node_arrays();
 	if (KTYPE[0] == 3){
-		int node_num;
-		int nreg;
-		double x, y, z, por;
-		for (std::vector<char> str : nodeData)
+		
+		for (int j = 0; j < nodeData.size();j++)
 		{
-			str.push_back('\0');
-			node_num = std::stoi(strtok(str.data(), " "));
-			nreg = std::stoi(strtok(NULL, " "));
-			x = std::stod(strtok(NULL, " ")) * SCALX;
-			y = std::stod(strtok(NULL, " "))*SCALY;
-			z = std::stod(strtok(NULL, " "))*SCALZ;
-			por = std::stod(strtok(NULL, " "))*PORFAC;
-			nodeContainer.push_back(Node(node_num, nreg, x, y, z, por));
+			
+			node_num[j] = std::stoi(strtok(nodeData[j].data(), " "));
+			node_nreg[j] = std::stoi(strtok(NULL, " "));
+			node_x[j] = std::stod(strtok(NULL, " "));
+			node_y[j] = std::stod(strtok(NULL, " "));
+			node_z[j] = std::stod(strtok(NULL, " "));
+			node_por[j] = std::stod(strtok(NULL, " "));
 		}
 	} else
 	{
 		//2D Nodes
 	}
 
+	if (KTYPE[0] == 3){
+
+		for (int j = 0; j < nodeData.size(); j++)
+		{
+			node_x[j] = node_x[j] * SCALX;
+			node_y[j] = node_y[j] * SCALY;
+			node_z[j] = node_z[j] * SCALZ;
+			node_por[j] = node_por[j] * PORFAC;
+			node_sop[j] = (1.0 - node_por[j])*COMPMA + node_por[j] * COMPFL;
+		}
+	}
+	else
+	{
+		//2D Nodes
+	}
 
 
 
 	// define incidence
 	incidenceContainer.reserve(NE);
-		int el_num;
 		for (int j = 1; j < incidenceData.size();j++)
 		{
 			std::vector<int> nodes;
-			el_num = std::stoi(strtok(incidenceData[j].data(), " "));
+			int el_numm = std::stoi(strtok(incidenceData[j].data(), " "));
 			for (int k = 0; k < N48; k++)
 			{
 				nodes.push_back(std::stoi(strtok(NULL, " ")));
 			}
-			incidenceContainer.push_back(std::pair<int, std::vector<int>>(el_num, nodes));
+			incidenceContainer.push_back(std::pair<int, std::vector<int>>(el_numm, nodes));
 		}
 
 	
@@ -1373,14 +1388,14 @@ void Storage::check_data_sets()
 		PRODS1 = 0.0;
 	}
 
-	for (int j = 0; j < nodeContainer.size();j++)
+	/*for (int j = 0; j < nodeContainer.size();j++)
 	{
 		nodeContainer[j].set_sop(COMPMA, COMPFL);
 		nodeContainer[j].set_qin(0.0);
 		nodeContainer[j].set_uin(0.0);
 		nodeContainer[j].set_quin(0.0);
 		nodeContainer[j].reserve_neighbors(N48*(N48-1));
-	}
+	}*/
 
 	if (KTYPE[0] == 3)
 	{
@@ -1402,16 +1417,17 @@ void Storage::check_data_sets()
 	}
 	
 	//Create Elements
-	elementContainer.reserve(NE);
-
+//	elementContainer.reserve(NE);
+	allocate_element_arrays();
+	Timer t;
 	if (KTYPE[0] == 3){
-		int el_num;
+		/*int el_num;
 		int lreg;
-		double pmax, pmid, pmin, ang1, ang2, ang3, almax, almid, almin, atmax, atmin, atmid;
+		double pmax, pmid, pmin, ang1, ang2, ang3, almax, almid, almin, atmax, atmin, atmid;*/
 		for (int j = 0; j < elementData.size();j++)
 		{
 			//str.push_back('\0');
-			el_num = std::stoi(strtok(elementData[j].data(), " "));
+	/*		el_num = std::stoi(strtok(elementData[j].data(), " "));
 			lreg = std::stoi(strtok(NULL, " "));
 			pmax = std::stod(strtok(NULL, " "))*PMAXFA;
 			pmid = std::stod(strtok(NULL, " "))*PMIDFA;
@@ -1424,14 +1440,82 @@ void Storage::check_data_sets()
 			almin = std::stod(strtok(NULL, " "))*ALMINF;
 			atmax = std::stod(strtok(NULL, " "))*ATMXF;
 			atmid = std::stod(strtok(NULL, " "))*ATMDF;
-			atmin = std::stod(strtok(NULL, " "))*ATMNF;
-			elementContainer.push_back(Element(el_num, lreg, pmax, pmid, pmin, ang1, ang2, ang3, almax, almid, almin, atmax, atmid, atmin));
+			atmin = std::stod(strtok(NULL, " "))*ATMNF;*/
+			el_num[j] = std::stoi(strtok(elementData[j].data(), " "));
+			el_lreg[j] = std::stoi(strtok(NULL, " "));
+			el_pmax[j] = std::stod(strtok(NULL, " "));
+			el_pmid[j] = std::stod(strtok(NULL, " "));
+			el_pmin[j] = std::stod(strtok(NULL, " "));
+			el_ang1[j] = std::stod(strtok(NULL, " "));
+			el_ang2[j] = std::stod(strtok(NULL, " "));
+			el_ang3[j] = std::stod(strtok(NULL, " "));
+			el_almax[j] = std::stod(strtok(NULL, " "));
+			el_almid[j] = std::stod(strtok(NULL, " "));
+			el_almin[j] = std::stod(strtok(NULL, " "));
+			el_atmax[j] = std::stod(strtok(NULL, " "));
+			el_atmid[j] = std::stod(strtok(NULL, " "));
+			el_atmin[j] = std::stod(strtok(NULL, " "));			
+		//	elementContainer.push_back(Element(&el_num[j],&el_lreg[j],&el_pmax[j],&el_pmid[j],&el_pmin[j],&el_ang1[j],&el_ang2[j],&el_ang3[j],&el_almax[j],&el_almid[j],&el_almin[j],&el_atmax[j],&el_atmid[j],&el_atmin[j]));
 		}
 	}
 	else
 	{
 		//2D Nodes
 	}
+
+	if (KTYPE[0] == 3){
+		for (int j = 0; j < NE; j++)
+			el_pmax[j] = el_pmax[j] * PMAXFA;
+		for (int j = 0; j < NE; j++)
+			el_pmid[j] = el_pmid[j] * PMIDFA;
+		for (int j = 0; j < NE; j++)
+			el_pmin[j] = el_pmin[j] * PMINFA;
+		
+		for (int j = 0; j < NE; j++)
+			el_ang1[j] = el_ang1[j] * ANG1FA;
+		for (int j = 0; j < NE; j++)
+			el_ang2[j] = el_ang2[j] * ANG2FA;
+		for (int j = 0; j < NE; j++)
+			el_ang3[j] = el_ang3[j] * ANG3FA;
+
+		for (int j = 0; j < NE; j++)
+			el_atmax[j] = el_atmax[j] * ATMXF;
+		for (int j = 0; j < NE; j++)
+			el_atmid[j] = el_atmid[j] * ATMDF;
+		for (int j = 0; j < NE; j++)
+			el_atmin[j] = el_atmin[j] * ATMNF;
+
+		for (int j = 0; j < NE; j++)
+			el_almax[j] = el_almax[j] * ALMAXF;
+		for (int j = 0; j < NE; j++)
+			el_almid[j] = el_almid[j] * ALMIDF;
+		for (int j = 0; j < NE; j++)
+			el_almin[j] = el_almin[j] * ALMINF;
+
+		for (int j = 0; j < NE; j++)
+			el_pangl1[j] = el_ang1[j] * D2R;
+		for (int j = 0; j < NE; j++)
+			el_pangl2[j] = el_ang2[j] * D2R;
+		for (int j = 0; j < NE; j++)
+			el_pangl3[j] = el_ang3[j] * D2R;
+
+		delete[] el_ang1;
+		delete[] el_ang2;
+		delete[] el_ang3;
+
+		for (int j = 0; j < NE; j++)
+		{
+			std::vector<double> rotMat;
+			ROTMAT(el_pangl1[j], el_pangl2[j], el_pangl3[j], rotMat);
+			TENSYM(el_pmax[j], el_pmid[j], el_pmin[j], rotMat, el_permxx[j], el_permxy[j], el_permxz[j], el_permyx[j], el_permyy[j], el_permyz[j], el_permzx[j], el_permzy[j], el_permzz[j]);
+		}
+		delete[] el_pmax;
+		delete[] el_pmid;
+		delete[] el_pmin;
+	}
+
+
+	std::cout << t << " seconds" << std::endl;
 
 	NSOPI = NSOP - 1;
 	NSOUI = NSOU - 1;
@@ -1465,8 +1549,8 @@ void Storage::check_data_sets()
 			IQSOP.push_back(IQCP);
 			if (IQCP < 0)
 				IQSOPT = -1;
-			nodeContainer[IQCPA - 1].set_qin(qinc);
-			nodeContainer[IQCPA - 1].set_uin(uinc);
+			node_qin[IQCPA - 1]=qinc;
+			node_uin[IQCPA - 1]=uinc;
 		}
 
 	}
@@ -1493,7 +1577,7 @@ void Storage::check_data_sets()
 			if (IQCU < 0)
 				IQSOUT = -1;
 
-			nodeContainer[IQCUA - 1].set_quin(quinc);
+			node_quin[IQCUA - 1]=quinc;
 		}
 	}
 
@@ -1516,8 +1600,8 @@ void Storage::check_data_sets()
 				{
 					pbc_ = std::stod(strtok(NULL, " "));
 					ubc_ = std::stod(strtok(NULL, " "));
-					nodeContainer[IDUMA - 1].set_pbc(pbc_);
-					nodeContainer[IDUMA - 1].set_ubc(ubc_);
+					node_pbc[IDUMA - 1]=pbc_;
+					node_ubc[IDUMA - 1]=ubc_;
 				} else if (IDUM < 0)
 				{
 					IPBCT = -1;
@@ -1541,7 +1625,7 @@ void Storage::check_data_sets()
 				if (IDUM > 0)
 				{
 					ubc_ = std::stod(strtok(NULL, " "));
-					nodeContainer[IDUMA - 1].set_ubc(ubc_);
+					node_ubc[IDUMA - 1]=ubc_;
 				} else if (IDUM < 0)
 				{
 					IUBCT = -1;
@@ -1617,14 +1701,14 @@ void Storage::check_data_sets()
 			double PUNI = p_ics[0];
 			for (int i = 0; i < nodeContainer.size(); i++)
 			{
-				nodeContainer[i].set_pvec(PUNI);
+				node_pvec[i]=PUNI;
 			}
 		}
 		else if (!strncmp(p_ics_string.data(), "'NONUNIFORM'", p_ics_string.size()))
 		{
 			for (int i = 0; i < nodeContainer.size(); i++)
 			{
-				nodeContainer[i].set_pvec(p_ics[i]);
+				node_pvec[i]=p_ics[i];
 			}
 		} else
 		{
@@ -1636,14 +1720,14 @@ void Storage::check_data_sets()
 			double UUNI = u_ics[0];
 			for (int i = 0; i < nodeContainer.size(); i++)
 			{
-				nodeContainer[i].set_uvec(UUNI);
+				node_uvec[i]=UUNI;
 			}
 		}
 		else if (!strncmp(u_ics_string.data(), "'NONUNIFORM'", u_ics_string.size()))
 		{
 			for (int i = 0; i < nodeContainer.size(); i++)
 			{
-				nodeContainer[i].set_uvec(u_ics[i]);
+				node_uvec[i]=u_ics[i];
 			}
 		}
 		else
@@ -1658,29 +1742,25 @@ void Storage::check_data_sets()
 			for (int j = 0; j < NPBC; j++)
 			{
 				if (IPBC[j] < 0)
-					nodeContainer[IPBC[j] - 1].set_pbc(nodeContainer[IPBC[j] - 1].get_pvec());
+					node_pbc[IPBC[j] - 1]=node_pvec[IPBC[j] - 1];
 			}
 		} else
 		{
 			for (int i = 0; i < NN; i++)
 			{
-				nodeContainer[i].set_pm1(nodeContainer[i].get_pvec());
-				nodeContainer[i].set_um1(nodeContainer[i].get_uvec());
-				nodeContainer[i].set_um2(nodeContainer[i].get_uvec());
-				nodeContainer[i].set_rcit(RHOW0 + DRWDU*(nodeContainer[i].get_uvec() - URHOW0));
+				node_pm1[i]=node_pvec[i];
+				node_um1[i] = node_uvec[i];
+				node_um2[i] = node_uvec[i];
+				node_rcit[i] = RHOW0 + DRWDU*(node_uvec[i] - URHOW0);
 			}
 		}
 		for (int i = 0; i < NN; i++)
 		{
-			nodeContainer[i].set_sw(1.0);
-			nodeContainer[i].set_swt(1.0);
-			nodeContainer[i].set_swb(1.0);
-			nodeContainer[i].set_cnub(0.0);
-			nodeContainer[i].set_dswdp(0.0);
-			nodeContainer[i].set_cs1(CS);
-			nodeContainer[i].set_sl(0.0);
-			nodeContainer[i].set_sr(0.0);
-			nodeContainer[i].set_dpdtitr(0.0);
+			node_sw[i]=1.0;
+			node_swt[i]=1.0;
+			node_swb[i]=1.0;
+			node_cs1[i]=CS;
+
 		}
 
 		if (IUNSAT)
@@ -1692,4 +1772,169 @@ void Storage::check_data_sets()
 	}
 
 	std::cout << "" << std::endl;
+}
+
+void Storage::allocate_element_arrays()
+{
+	if (KTYPE[0] == 3){
+		el_num = new int[NE];
+		el_lreg = new int[NE];
+		el_pmax = new double[NE];
+		el_pmid = new double[NE];
+		el_pmin = new double[NE];
+		el_ang1 = new double[NE];
+		el_ang2 = new double[NE];
+		el_ang3 = new double[NE];
+		el_pangl1 = new double[NE];
+		el_pangl2 = new double[NE];
+		el_pangl3 = new double[NE];
+		el_almax = new double[NE];
+		el_almid = new double[NE];
+		el_almin = new double[NE];
+		el_atmax = new double[NE];
+		el_atmid = new double[NE];
+		el_atmin = new double[NE];
+		el_permxx = new double[NE];
+		el_permxy = new double[NE];
+		el_permxz = new double[NE];
+		el_permyx = new double[NE];
+		el_permyy = new double[NE];
+		el_permyz = new double[NE];
+		el_permzx = new double[NE];
+		el_permzy = new double[NE];
+		el_permzz = new double[NE];
+		el_gxsi = std::vector<std::vector<double>>(NE,std::vector<double>(N48,0));
+		el_geta = std::vector<std::vector<double>>(NE, std::vector<double>(N48, 0));
+		el_gzet = std::vector<std::vector<double>>(NE, std::vector<double>(N48, 0));
+		el_det = std::vector<std::vector<double>>(NE, std::vector<double>(N48, 0));
+		elementContainer.reserve(NE);
+	}
+}
+void Storage::allocate_node_arrays()
+{
+	if (KTYPE[0] == 3)
+	{
+		node_num = new int[NN];
+		node_nreg = new int[NN];
+		node_x = new double[NN];
+		node_y = new double[NN];
+		node_z = new double[NN];
+		node_por = new double[NN];
+		node_sop = new double[NN];
+		node_qin = new double[NN]{};
+		node_uin = new double[NN]{};
+		node_quin = new double[NN]{};
+		node_pbc = new double[NN]{};
+		node_ubc = new double[NN]{};
+		node_pvec = new double[NN]{};
+		node_uvec = new double[NN]{};
+		node_um1 = new double[NN]{};
+		node_um2 = new double[NN]{};
+		node_pm1 = new double[NN]{};
+		node_rcit = new double[NN]{};
+		node_sw = new double[NN]{};
+		node_swt = new double[NN]{};
+		node_swb = new double[NN]{};
+		node_cnub = new double[NN]{};
+		node_dswdp = new double[NN]{};
+		node_cs1 = new double[NN]{};
+		node_cs2 = new double[NN]{};
+		node_cs3 = new double[NN]{};
+		node_sl = new double[NN]{};
+		node_sr = new double[NN]{};
+		node_dpdtitr = new double[NN]{};
+		node_neighbors = std::vector<std::vector<int>>(NN, std::vector<int>());
+	}
+}
+
+void Storage::de_allocate_node_arrays()
+{
+	if (KTYPE[0] == 3)
+	{
+		delete[] node_num;
+		delete[] node_x;
+		delete[] node_y;
+		delete[] node_z;
+		delete[] node_nreg;
+		delete[] node_por;
+		delete[] node_sop;
+		delete[] node_qin;
+		delete[] node_uin;
+		delete[] node_quin;
+		delete[] node_pbc;
+		delete[] node_ubc;
+		delete[] node_pvec;
+		delete[] node_uvec;
+		delete[] node_um1;
+		delete[] node_um2;
+		delete[] node_pm1;
+	}
+}
+
+
+void Storage::de_allocate_element_arrays()
+{
+
+	if (KTYPE[0] == 3){
+		delete[]el_num;
+		delete[]el_lreg;
+		delete[]el_almax;
+		delete[]el_almid;
+		delete[]el_almin;
+		delete[]el_atmax;
+		delete[]el_atmid;
+		delete[]el_atmin;
+		delete[]el_permxx;
+		delete[]el_permxy;
+		delete[]el_permxz;
+		delete[]el_permyx;
+		delete[]el_permyy;
+		delete[]el_permyz;
+		delete[]el_permzx;
+		delete[]el_permzy;
+		delete[]el_permzz;
+		delete[]el_pangl1;
+		delete[]el_pangl2;
+		delete[]el_pangl3;
+
+	
+	}
+}
+
+void Storage::ROTMAT(double& a1, double& a2, double& a3, std::vector<double>& vec)
+{
+	
+	double s1 = sin(a1);
+	double s2 = sin(a2);
+	double s3 = sin(a3);
+	double c1 = cos(a1);
+	double c2 = cos(a2);
+	double c3 = cos(a3);
+	vec.assign({ c1*c2, -1 * c1*s2*s3 - s1*c3, -1 * c1*s2*c3 + s1*s3, s1*c2, -1 * s1*s2*s3 + c1*c3, -1 * s1*s2*c3 - c1*s3, s2, c2*s3 - s1*c3, c2*c3 });
+
+}
+
+void Storage::TENSYM(double& pmax,double& pmid,double& pmin,std::vector<double>& rotMat,double& permxx,double& permxy,double &permxz,double& permyx,double&permyy,double& permyz,double& permzx,double& permzy,double& permzz)
+{
+	permxx = rotMat[0] * rotMat[0] * pmax +
+		rotMat[1] * rotMat[1] * pmid +
+		rotMat[2] * rotMat[2] *pmin;
+	permxy = rotMat[0] * rotMat[3] * pmax +
+		rotMat[1] * rotMat[4] * pmid +
+		rotMat[2] * rotMat[5] * pmin;
+	permxz = rotMat[0] * rotMat[6] * pmax +
+		rotMat[1] * rotMat[7] * pmid +
+		rotMat[2] * rotMat[8] * pmin;
+	permyy = rotMat[3] * rotMat[3] * pmax +
+		rotMat[4] * rotMat[4] * pmid +
+		rotMat[5] * rotMat[5] * pmin;
+	permyz = rotMat[3] * rotMat[6] * pmax +
+		rotMat[4] * rotMat[7] * pmid +
+		rotMat[5] * rotMat[8] * pmin;
+	permzz = rotMat[6] * rotMat[6] * pmax +
+		rotMat[7] * rotMat[7] * pmid +
+		rotMat[8] * rotMat[8] * pmin;
+	permyx = permxy;
+	permzx = permxz;
+	permzy = permyz;
 }

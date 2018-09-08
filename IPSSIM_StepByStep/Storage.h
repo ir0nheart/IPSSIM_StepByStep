@@ -203,6 +203,12 @@ public:
 	int FINDL3(int el_no,obsPoint& obs,double& xsi_,double& eta_,double& zet_);
 	void PTRSET();
 	void BANWID();
+	void allocate_element_arrays();
+	void de_allocate_element_arrays();
+	void allocate_node_arrays();
+	void de_allocate_node_arrays();
+	void ROTMAT(double& a1, double& a2, double& a3, std::vector<double>& vec);
+	void TENSYM(double& pmax, double& pmid, double& pmin, std::vector<double>& rotMat, double& permxx, double& permxy, double &permxz, double& permyx, double&permyy, double& permyz, double& permzx, double& permzy, double& permzz);
 private:
 	static Storage * m_pInstance;
 	std::unordered_map<std::string, DataSet *> dataSetMap;
@@ -238,13 +244,25 @@ private:
 	std::vector<std::vector<char>> nsouData;
 	std::vector<std::vector<char>> npbcData;
 	std::vector<std::vector<char>> nubcData;
-	std::vector<double> p_ics;
-	std::vector<double> u_ics;
+
 	std::vector<char> p_ics_string;
 	std::vector<char> u_ics_string;
 
+	std::vector<int> IQSOP;
+	std::vector<int> IQSOU;
+	std::vector<int>IPBC;
+	std::vector<int>IUBC;
+	std::vector<int> incidence_vector;
+	std::vector<int> IA;
+	std::vector<int> JA;
+
+	std::vector<double> p_ics;
+	std::vector<double> u_ics;
+
 	std::vector<Schedule *> schedule_list;
-	double t_ics;
+	char CINACT;
+
+	
 	int solution_storage;
 	int NN, NE, NSOP, NSOU, NPBC, NUBC,NOBS;
 	int NSCH, NPCYC, NUCYC;
@@ -260,42 +278,9 @@ private:
 	int number_of_layers;
 	int NOBCYC;
 	
-	char CINACT;
-	double u_tolerance;
-	double p_tolerance;
-	double UP, GNUP, GNUU;
-	double COMPFL;
-	double CW;
-	double SIGMAW;
+	
 
-	double RHOW0;
-	double URHOW0;
-	double VISC0;
-	double DRWDU;
 
-	double COMPMA;
-	double CS;
-	double RHOS;
-	double SIGMAS;
-	double PRODF0;
-	double PRODS0;
-	double PRODF1;
-	double PRODS1;
-
-	double GRAVX;
-	double GRAVY;
-	double GRAVZ;
-
-	double SCALX;
-	double SCALY;
-	double SCALZ;
-	double PORFAC;
-	double PSTAR;
-	double GCONST;
-	double TEMP;
-	double SMWH;
-	double time_step_divide;
-	double water_table;
 	int ME; // -1 For Solute , + 1 for ENERGY
 	int IUNSAT;
 	int ISSFLO;
@@ -323,6 +308,21 @@ private:
 	int NSOUI;
 	int IQSOPT;
 	int IQSOUT;
+	int IBCUBC;
+	int IBCPBC;
+	int IPBCT;
+	int IUBCT;
+	int ITMAX;
+	int NDIMJA;
+	int NELT;
+	int NB;
+	int NBHALF;
+	int NBI;
+	int max_bandwidth_element;
+	int ITRST;
+	double DELTP;
+	double DELTU;
+	double TSEC;
 	double TSTART;
 	double DELT;
 	double CHI1;
@@ -339,38 +339,118 @@ private:
 	double ATMXF;
 	double ATMDF;
 	double ATMNF;
-	double D2R;
+	
 	double GNUP1;
 	double GNUU1;
-	int IBCUBC;
-	int IBCPBC;
-	std::vector<int> IQSOP;
-	std::vector<int> IQSOU;
-	std::vector<int>IPBC;
-	std::vector<int>IUBC;
-	int IPBCT;
-	int IUBCT;
-	int ITMAX;
-	int NDIMJA;
-	int NELT;
+	double SCALX;
+	double SCALY;
+	double SCALZ;
+	double PORFAC;
+	double PSTAR;
+	double GCONST;
+	double TEMP;
+	double SMWH;
+	double time_step_divide;
+	double water_table;
+	double u_tolerance;
+	double p_tolerance;
+	double UP, GNUP, GNUU;
+	double COMPFL;
+	double CW;
+	double SIGMAW;
+
+	double RHOW0;
+	double URHOW0;
+	double VISC0;
+	double DRWDU;
+
+	double COMPMA;
+	double CS;
+	double RHOS;
+	double SIGMAS;
+	double PRODF0;
+	double PRODS0;
+	double PRODF1;
+	double PRODS1;
+
+	double GRAVX;
+	double GRAVY;
+	double GRAVZ;
+	double t_ics;
+
 	std::vector<bool> BCSFL;
 	std::vector<bool> BCSTR;
 	std::vector<int> KTYPE; // KTYPE[0] for MESH TYPE 2D = 2, 3D=3  --- KTYPE[1] for MESH TYPE IRREGULAR=0,LAYERED=1,REGULAR=2,BLOCKWISE =3
 	std::vector<Node> nodeContainer;
 	std::vector<Element> elementContainer;
+
 	std::vector<obsPoint> obsContainer;
 	std::vector < std::pair<int, std::vector<int>>> incidenceContainer;
-	std::vector <int> incidence_vector;
-	std::vector<int> IA;
-	std::vector<int> JA;
-	int NB;
-	int NBHALF;
-	int NBI;
-	int max_bandwidth_element;
-	int ITRST;
-	double DELTP;
-	double DELTU;
-	double TSEC;
+	// Element Relevant Data
+	int * el_num;
+	int * el_lreg;
+	double * el_pmax;
+	double * el_pmid;
+	double * el_pmin;
+	double * el_ang1;
+	double * el_ang2;
+	double * el_ang3;
+	double * el_almax;
+	double * el_almid;
+	double * el_almin;
+	double * el_atmax;
+	double * el_atmid;
+	double * el_atmin;
+	double * el_pangl1;
+	double * el_pangl2;
+	double * el_pangl3;
+	double * el_permxx;
+	double * el_permxy;
+	double * el_permxz;
+	double * el_permyx;
+	double * el_permyy;
+	double * el_permyz;
+	double * el_permzx;
+	double * el_permzy;
+	double * el_permzz;
+
+	std::vector<std::vector<double>> el_gxsi;
+	std::vector<std::vector<double>> el_geta;
+	std::vector<std::vector<double>> el_gzet;
+	std::vector<std::vector<double>> el_det;
+
+	// Node Relevant Data
+
+	int * node_num;
+	int * node_nreg;
+	double * node_x;
+	double * node_y;
+	double * node_z;
+	double * node_por;
+	double * node_sop;
+	double * node_qin;
+	double * node_uin;
+	double * node_quin;
+	double * node_pbc;
+	double * node_ubc;
+	double * node_pvec;
+	double * node_uvec;
+	double * node_pm1;
+	double * node_um1;
+	double * node_um2;
+	double * node_rcit;
+	double * node_sw;
+	double * node_swt;
+	double * node_swb;
+	double * node_cnub;
+	double * node_dswdp;
+	double * node_cs1;
+	double * node_cs2;
+	double * node_cs3;
+	double * node_sl;
+	double * node_sr;
+	double * node_dpdtitr;
+	std::vector<std::vector<int>> node_neighbors;
 	Storage();
 	~Storage();
 };

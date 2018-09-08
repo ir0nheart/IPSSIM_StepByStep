@@ -955,7 +955,7 @@ void Parser::parseDataSet_8E_9_10_11()
 			it++;
 	}
 
-	storage->set_compfl(stod(std::string(data_set_10[0].begin(), data_set_10[0].end())));
+	storage->set_compma(stod(std::string(data_set_10[0].begin(), data_set_10[0].end())));
 	storage->set_cs(stod(std::string(data_set_10[1].begin(), data_set_10[1].end())));
 	storage->set_sigmas(stod(std::string(data_set_10[2].begin(), data_set_10[2].end())));
 	storage->set_rhos(stod(std::string(data_set_10[3].begin(), data_set_10[3].end())));
@@ -1090,9 +1090,10 @@ void Parser::parseDataSet_14B()
 		}
 	}
 
-	storage->reserveNodeData();
+	
 
-	/*for (int i = 0; i < lines.size();i++){
+	/*storage->reserveNodeData();
+	 for (int i = 0; i < lines.size();i++){
 		std::vector<std::vector<char>> data_set_14B(6);
 		int it = 0;
 		for (char c : lines[i])
