@@ -6,6 +6,7 @@ class Schedule
 public:
 	Schedule(std::string name);
 	Schedule(std::string name, std::string type);
+	double get_time_at_step(int i) const{ return step_time[i].second; }
 	bool get_elapsed() const{ return elapsed; }
 	bool get_sbased() const{ return sbased; }
 	void set_step_at(int ind, int step){ step_time[ind].first = step; }

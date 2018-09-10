@@ -79,11 +79,13 @@ void InputFiles::setFilesForReading()
 	if (inputFileMap["BCS"] != "")
 	{
 		filesToRead["BCS"] = inputFileMap["BCS"];
+		Storage::instance()->set_bcs_defined(true);
 	}
 	else
 	{
 		std::cout << "WARNING!!" << std::endl;
 		std::cout << "BCS (Boundary Conditions) input file for simulation is not defined in SUTRA.FIL file." << std::endl;
+		Storage::instance()->set_bcs_defined(false);
 	}
 
 	if (inputFileMap["ICS"] != "")

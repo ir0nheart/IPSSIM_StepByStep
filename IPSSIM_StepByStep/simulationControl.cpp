@@ -111,9 +111,13 @@ void SimulationControl::run()
 	fileParser->extractDataSets();
 	std::cout << "All Data Sets are extracted in " << t << "seconds."<< std::endl;
 	fileParser->unmapFile();
+	
 	fileParser->mapFile(iFiles->getFilesForReading()["ICS"]);
 	fileParser->extractICS();
 	fileParser->unmapFile();
+
+	
+
 	store->check_data_sets();
 
 	// HERE SUTRA STARTS
@@ -123,4 +127,6 @@ void SimulationControl::run()
 	store->set_flags();
 	store->set_starting_time();
 	store->output_initial_starting_if_transient();
+	store->set_steady_state_switches();
+	store->simulation();
 }

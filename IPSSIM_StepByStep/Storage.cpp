@@ -4,7 +4,8 @@
 #include "obsPoint.h"
 #include "Timer.h"
 #include <algorithm>
-
+#include "Parser.h"
+#include "InputFiles.h"
 Storage * Storage::m_pInstance = nullptr;
 
 Storage * Storage::instance()
@@ -434,6 +435,15 @@ Storage::Storage()
 		DataSet* dataSet = new DataSet(dataSets[i]);
 		dataSetMap[dataSets[i]] = dataSet;
 	}
+	INTIM = true;
+	ISTOP = 0;
+	KSOLVP = 1;
+
+
+	GXLOC.assign({ -1, 1, 1, -1, -1, 1, 1, -1 });
+	GYLOC.assign({ -1, -1, 1, 1, -1, -1, 1, 1 });
+	GZLOC.assign({ -1, -1, -1, -1, 1, 1, 1, 1 });
+
 }
 
 
@@ -668,6 +678,13 @@ void Storage::PTRSET()
 		}
 	}
 	JA.push_back(NELT);
+
+	// ALLOCATE PMAT UMAT
+	PMAT = new double[NELT];
+	UMAT = new double[NELT];
+	new_MAT = new double[NELT];
+	row_jumper = new int[NN + 1]{};
+	col_indices = new int[NELT]{};
 }
 
 void Storage::BANWID()
@@ -1225,6 +1242,8 @@ void Storage::check_data_sets()
 	NSOU = NSOU + 1;
 	NOBSN = NOBS + 1;
 
+	
+
 	if (KTYPE[0] == 3)
 	{
 		N48 = 8;
@@ -1236,6 +1255,12 @@ void Storage::check_data_sets()
 	}
 
 	NIN = NE * N48;
+
+	if (bcs_defined)
+	{
+		Parser::instance()->mapFile(InputFiles::instance()->getFilesForReading()["BCS"]);
+		Parser::instance()->extractBCS();
+	}
 
 	// Create Nodes
 	nodeContainer.reserve(NN);
@@ -1289,11 +1314,14 @@ void Storage::check_data_sets()
 		}
 
 	
-
+		IBCUBC = new int[NBCN];
+		IBCPBC = new int[NBCN];
+		IBCSOP = new int[NSOP];
+		IBCSOU = new int[NSOU];
 	// define iqsop,iqsou,ipbc,iubc,iidpbc,iidubc,iidsop,iidsou,ibcpbc,ibcubc,ibcsop,ibcsou
 	 // !!TODO
-	BCSTR.reserve(ITMAX);
-	BCSFL.reserve(ITMAX);
+	BCSTR = std::vector<bool>(ITMAX + 1,true);
+	BCSFL = std::vector<bool>(ITMAX + 1, true);
 
 	if (simulation_output_controls[0][0] == 'Y')
 		KNODAL = +1;
@@ -1589,6 +1617,7 @@ void Storage::check_data_sets()
 		{
 			int IDUM, IDUMA;
 			double pbc_, ubc_;
+			GNUP1 = std::vector<double>(npbcData.size(), 0);
 			for (int j = 0; j < npbcData.size() - 1; j++)
 			{
 				IDUM = std::stoi(strtok(npbcData[j].data(), " "));
@@ -1606,8 +1635,9 @@ void Storage::check_data_sets()
 				{
 					IPBCT = -1;
 				}
+				GNUP1[j] = GNUP;
 			}
-			GNUP1 = GNUP;
+			QPLITR = std::vector<double>(npbcData.size(), 0);
 			IBCPBC = 0;
 		}
 	
@@ -1615,6 +1645,7 @@ void Storage::check_data_sets()
 		{
 			int IDUM, IDUMA;
 			double ubc_;
+			GNUU1 = std::vector<double>(nubcData.size(), 0);
 			for (int j = 0; j < nubcData.size() - 1; j++)
 			{
 				IDUM = std::stoi(strtok(nubcData[j].data(), " "));
@@ -1630,8 +1661,9 @@ void Storage::check_data_sets()
 				{
 					IUBCT = -1;
 				}
+				GNUU1[j] = GNUU;
 			}
-			GNUU1 = GNUU;
+			
 			IBCUBC = 0;
 		}
 	}
@@ -1692,21 +1724,24 @@ void Storage::check_data_sets()
 	}
 
 	BANWID();
-
-
+	{ for (int i = 0; i <= ITMAX; i++){
+		ITBCS = i;
+		BCSTEP();
+		}
+	}
 	{
 		ITRST = 0;
 		if (!strncmp(p_ics_string.data(), "'UNIFORM'", p_ics_string.size()))
 		{
 			double PUNI = p_ics[0];
-			for (int i = 0; i < nodeContainer.size(); i++)
+			for (int i = 0; i < NN; i++)
 			{
 				node_pvec[i]=PUNI;
 			}
 		}
 		else if (!strncmp(p_ics_string.data(), "'NONUNIFORM'", p_ics_string.size()))
 		{
-			for (int i = 0; i < nodeContainer.size(); i++)
+			for (int i = 0; i < NN; i++)
 			{
 				node_pvec[i]=p_ics[i];
 			}
@@ -1718,14 +1753,14 @@ void Storage::check_data_sets()
 		if (!strncmp(u_ics_string.data(), "'UNIFORM'", u_ics_string.size()))
 		{
 			double UUNI = u_ics[0];
-			for (int i = 0; i < nodeContainer.size(); i++)
+			for (int i = 0; i < NN; i++)
 			{
 				node_uvec[i]=UUNI;
 			}
 		}
 		else if (!strncmp(u_ics_string.data(), "'NONUNIFORM'", u_ics_string.size()))
 		{
-			for (int i = 0; i < nodeContainer.size(); i++)
+			for (int i = 0; i < NN; i++)
 			{
 				node_uvec[i]=u_ics[i];
 			}
@@ -1803,6 +1838,9 @@ void Storage::allocate_element_arrays()
 		el_permzx = new double[NE];
 		el_permzy = new double[NE];
 		el_permzz = new double[NE];
+		el_vmag = new double[NE]{};
+		el_vang1 = new double[NE]{};
+		el_vang2 = new double[NE]{};
 		el_gxsi = std::vector<std::vector<double>>(NE,std::vector<double>(N48,0));
 		el_geta = std::vector<std::vector<double>>(NE, std::vector<double>(N48, 0));
 		el_gzet = std::vector<std::vector<double>>(NE, std::vector<double>(N48, 0));
@@ -1843,6 +1881,20 @@ void Storage::allocate_node_arrays()
 		node_sl = new double[NN]{};
 		node_sr = new double[NN]{};
 		node_dpdtitr = new double[NN]{};
+		node_uiter = new double[NN]{};
+		node_piter = new double[NN]{};
+		node_pvel = new double[NN]{};
+		node_rcitm1 = new double[NN]{};
+		node_qinitr = new double[NN]{};
+		node_p_rhs = new double[NN]{};
+		node_u_rhs = new double[NN]{};
+		node_p_solution = new double[NN]{};
+		node_u_solution = new double[NN]{};
+		node_vol = new double[NN]{};
+		node_rho = new double[NN]{};
+		node_relkb = new double[NN]{};
+		node_relk = new double[NN]{};
+		node_relkt = new double[NN]{};
 		node_neighbors = std::vector<std::vector<int>>(NN, std::vector<int>());
 	}
 }
@@ -1868,6 +1920,10 @@ void Storage::de_allocate_node_arrays()
 		delete[] node_um1;
 		delete[] node_um2;
 		delete[] node_pm1;
+		delete[] node_rho;
+		delete[] node_relkt;
+		delete[] node_relkb;
+		delete[] node_relk;
 	}
 }
 
@@ -1896,7 +1952,9 @@ void Storage::de_allocate_element_arrays()
 		delete[]el_pangl1;
 		delete[]el_pangl2;
 		delete[]el_pangl3;
-
+		delete[]el_vmag;
+		delete[]el_vang1;
+		delete[]el_vang2;
 	
 	}
 }
@@ -2007,4 +2065,1819 @@ void Storage::output_initial_starting_if_transient()
 			
 		}
 	}
+}
+void Storage::set_steady_state_switches()
+{
+	if (ISSFLO == 1)
+	{
+		ML = 1;
+		NOUMAT = 0;
+		ISSFLO = 2;
+		ITER = 0;
+		DLTPM1 = DELTP;
+		DLTUM1 = DELTU;
+		BDELP1 = 1.0;
+		BDELP = 0.0;
+		BDELU = 0.0;
+		switch_set = true;
+		if (ISSTRA != 0)
+		{
+			
+		} else
+		{
+			TELAPS = TSEC - TSTART;
+		}
+	} else
+	{
+		switch_set = false;
+	}
+}
+
+void Storage::simulation()
+{
+	if (switch_set)
+		goto BEGIN_ITERATION;
+	BEGIN_TIMESTEP:
+	IT++;
+	ITREL = IT - ITRST;
+	ITBCS = IT;
+	DIT = (double)IT;
+	ITER = 0;
+	ML = 0;
+	NOUMAT = 0;
+	if (ONCEP && ITREL > 2)
+	{
+		if (((IT - 1) % NPCYC != 0) && (IT % NPCYC != 0) && (!BCSFL[IT - 1]) && (!BCSFL[IT]) && ITRMAX == 1)
+			NOUMAT = 1;
+	}
+
+	if (IT!=1 && ISSFLO==2)
+	{
+		if ((IT%NPCYC != 0) && (!BCSFL[IT]))
+			ML = 2;
+		if ((IT%NUCYC != 0) && (!BCSTR[IT]))
+			ML = 1;
+	}
+
+	TSECM1 = TSEC;
+	TSEC = schedule_list[time_steps_index]->get_time_at_step(IT);
+	TMIN = TSEC / 60.0;
+	THOUR = TMIN / 60;
+	TDAY = THOUR / 24;
+	TWEEK = TDAY / 7;
+	TMONTH = TDAY / 30.4375;
+	TYEAR = TDAY / 365.25;
+
+	DELTM1 = DELT;
+	DELT = TSEC - TSECM1;
+	RELCHG = abs((DELT - DELTLC) / DELTLC);
+
+	if (RELCHG > 1e-14)
+	{
+		DELTLC = DELT;
+		NOUMAT = 0;
+	}
+	// ML=0 P and U ,, ML =1 P only, ML =2 U only
+
+	if (ISSTRA != 0)
+	{
+		std::cout << "TIME STEP " << IT << " OF " << ITMAX << std::endl;
+	} else
+	{
+		TELAPS = TSEC - TSTART;
+		std::cout << "TIME STEP " << IT << " OF " << ITMAX << " ; ELAPSED TIME " << TELAPS << " OF " << TEMAX << " [s]" << std::endl;
+	}
+
+	if (ML == 0)
+	{
+		DLTPM1 = DELTP;
+		DLTUM1 = DELTU;
+		DELTP = TSEC - TSECP0;
+		DELTU = TSEC - TSECU0;
+		TSECP0 = TSEC;
+		TSECU0 = TSEC;
+	} else if (ML == 1)
+	{
+		DLTPM1 = DELTP;
+		DELTP = TSEC - TSECP0;
+		TSECP0 = TSEC;
+	} else if (ML == 2)
+	{
+		DLTUM1 = DELTU;
+		DELTU = TSEC - TSECU0;
+		TSECU0 = TSEC;
+	} else
+	{
+		std::cout << "Error in ML Value ." << std::endl;
+		SimulationControl::exitOnError();
+	}
+
+	BDELP = (DELTP / DLTPM1)*0.5;
+	BDELU = (DELTU / DLTUM1)*0.5;
+	BDELP1 = BDELP + 1.0;
+	BDELU1 = BDELU + 1.0;
+BEGIN_ITERATION:
+	ITER = ITER + 1;
+	if (ITRMAX != 1)
+		std::cout << " NON _LINEARITY ITERATION " << std::endl;
+
+	if (ML == 0)
+	{
+		for (int j = 0; j < NN; j++)
+		{
+			node_dpdtitr[j] = (node_pvec[j] - node_pm1[j]) / DELTP;
+			node_piter[j] = node_pvec[j];
+			node_pvel[j] = node_pvec[j];
+			node_uiter[j] = node_uvec[j];
+			node_rcitm1[j] = node_rcit[j];
+			node_rcit[j] = RHOW0 + DRWDU *(node_uiter[j] - URHOW0);
+		}
+
+		for (int i = 0; i < NPBC; i++)
+		{
+			int v = abs(IPBC[i]) - 1;
+			QPLITR[i] = GNUP1[i] * (node_pbc[v] - node_piter[v]);
+		}
+
+		if (ITER <= 2)
+		{
+			for (int k = 0; k < NN; k++)
+				node_qinitr[k] = node_qin[k];
+		}
+
+		if (ITER == 1)
+		{
+			for (int ii = 0; ii < NN; ii++)
+			{
+				node_piter[ii] = BDELP1 * node_pvec[ii] - BDELP*node_pm1[ii];
+				node_uiter[ii] = BDELU1 * node_uvec[ii] - BDELU*node_um1[ii];
+
+				node_dpdtitr[ii] = (node_pvec[ii] / node_pm1[ii]) / DLTPM1;
+				node_pm1[ii] = node_pvec[ii];
+				node_um2[ii] = node_um1[ii];
+				node_um1[ii] = node_uvec[ii];
+			}
+		}
+	}
+	else if (ML == 1)
+	{
+		for (int i = 0; i < NN; i++)
+		{
+			node_pvel[i] = node_pvec[i];
+			node_piter[i] = node_pvec[i];
+		}
+		if (ITER == 1)
+		{
+			for (int j = 0; j < NN; j++)
+			{
+				node_piter[j] = BDELP1*node_pvec[j] - BDELP*node_pm1[j];
+				node_uiter[j] = node_uvec[j];
+				node_rcitm1[j] = node_rcit[j];
+				node_rcit[j] = RHOW0 + DRWDU*(node_uiter[j] - URHOW0);
+				node_pm1[j] = node_pvec[j];
+			}
+		}
+	}
+	else if (ML == 2)
+	{
+		if (ITER == 1)
+		{
+			for (int i = 0; i < NN; i++)
+				node_uiter[i] = BDELU1*node_uvec[i] - BDELU*node_um1[i];
+			
+		} else
+		{
+			for (int i = 0; i < NN; i++)
+				node_uiter[i] = node_uvec[i];
+		}
+
+		if (NOUMAT == 1)
+		{
+			for (int i = 0; i < NN; i++){
+				node_um2[i] = node_um1[i];
+				node_um1[i] = node_uvec[i];
+				node_cnubm1[i] = node_cnub[i];
+			}
+		}
+
+		if (ITER == 1)
+		{
+			for (int i = 0; i < NN; i++){
+				node_dpdtitr[i] = (node_pvec[i] - node_pm1[i]) / DELTP;
+				node_qinitr[i] = node_qin[i];
+				node_piter[i] = node_pvec[i];
+				node_pvel[i] = node_pvec[i];
+				node_rcitm1[i] = node_rcit[i];
+			}
+
+			for (int i = 0; i < NPBC; i++)
+			{
+				int v = abs(IPBC[i]) - 1;
+				QPLITR[i] = GNUP1[i] * (node_pbc[v] - node_piter[v]);
+			}
+
+			for (int i = 0; i < NN; i++){
+				node_um2[i] = node_um1[i];
+				node_um1[i] = node_uvec[i];
+				node_cnubm1[i] = node_cnub[i];
+			}
+		}
+	}
+	else
+	{
+		std::cout << "Error in ML Value ." << std::endl;
+		SimulationControl::exitOnError();
+	}
+
+	// ZERO OUT ARRAYS
+	if (ML <= 1)
+	{
+		init_a_val(PMAT, NELT, 0.0);
+		init_a_val(node_p_rhs, NN, 0.0);
+		init_a_val(node_vol, NN, 0.0);
+		if (ML != 1)
+		{
+			if (NOUMAT <= 1)
+			{
+				init_a_val(UMAT, NELT, 0.0);
+			}
+			init_a_val(node_p_rhs, NN, 0.0);
+		}
+	} else
+	{
+		if (NOUMAT <= 1)
+		{
+			init_a_val(UMAT, NELT, 0.0);
+		}
+		init_a_val(node_p_rhs, NN, 0.0);
+	}
+
+
+	if (ITER == 1 && IBCT != 4)
+	{
+		BCTIME();
+	}
+
+	if ((ITER == 1) && bcs_defined)
+	{
+		BCSTEP();
+	}
+
+
+	if (ML != 1 && ME == -1 && NOUMAT == 0 && !strncmp(adsorption_string.data(), "NONE", 4))
+		ADSORB();
+
+	if (NOUMAT == 0)
+	{
+		if (KTYPE[0] == 3)
+		{
+			ELEMN3();
+		} else
+		{
+			ELEMN2();
+		}
+	}
+
+		NODAL();
+
+		BC();
+
+		double pnorm = DNRM2(NN, node_p_rhs, 1);
+		if (pnorm == 0)
+		{
+			for (int i = 0; i < NN; i++)
+				node_p_solution[i] = 0.0;
+			std::cout << " P solution inferred from Matrix equation. No solver called." << std::endl;
+		} else
+		{
+			// if but we will try gmres
+			// solve for p;
+			// convert to row compressed
+			re_orient_matrix(NN + 1, NELT, PMAT, JA, IA, new_MAT, row_jumper, col_indices);
+			// set vienna cl rhs vector
+			viennacl::vector<double> vcl_rhs = viennacl::scalar_vector<double>(NN, 0.0);
+			for (int i = 0; i < NN; i++)
+				vcl_rhs[i] = node_p_rhs[i];
+			// Set Matrix;
+			viennacl::compressed_matrix<double> A;
+			A.set(row_jumper, col_indices, new_MAT, NN, NN,NELT);
+			
+			// Preconditioner
+			viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0(A, viennacl::linalg::ilu0_tag());
+			viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 2000);
+			viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
+			viennacl::vector<double> vcl_results = my_gmres_solver(A, vcl_rhs, ilu0);
+			for (int i = 0; i < NN; i++)
+				node_p_rhs[i] = vcl_results[i];
+			int ITRS = my_gmres_solver.tag().iters();
+			double ERR = my_gmres_solver.tag().error();
+		}
+
+		if (ISSFLO != 0)
+		{
+			for (int i = 0; i < NN; i++)
+				node_pm1[i] = node_p_solution[i];
+		}
+
+		if (ML != 1)
+		{
+			//if (NOUMAT)
+			double unorm = DNRM2(NN, node_u_rhs, 1);
+			if (unorm == 0)
+			{
+				for (int i = 0; i < NN; i++)
+					node_u_solution[i] = 0.0;
+				std::cout << " U Solution inferred from matrix equation" << std::endl;
+			} else
+			{
+				// Solve for U;
+				re_orient_matrix(NN + 1, NELT, UMAT, JA, IA, new_MAT, row_jumper, col_indices);
+				// set vienna cl rhs vector
+				viennacl::vector<double> vcl_rhs = viennacl::scalar_vector<double>(NN, 0.0);
+				for (int i = 0; i < NN; i++)
+					vcl_rhs[i] = node_u_rhs[i];
+				// Set Matrix;
+				viennacl::compressed_matrix<double> A;
+				A.set(row_jumper, col_indices, new_MAT, NELT, NN, NN);
+				// Preconditioner
+				viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0(A, viennacl::linalg::ilu0_tag());
+				viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 1600);
+				viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
+				viennacl::vector<double> vcl_results = my_gmres_solver(A, vcl_rhs, ilu0);
+				for (int i = 0; i < NN; i++)
+					node_u_rhs[i] = vcl_rhs[i];
+				int ITRS = my_gmres_solver.tag().iters();
+				double ERR = my_gmres_solver.tag().error();
+			}
+		}
+
+		for (int i = 0; i < NN; i++)
+		{
+			node_cnubm1[i] = node_cnub[i];
+			double ueff = max(node_u_solution[i], 1e-10);
+			node_cnub[i] = node_cnubm1[i] + (-0.5 * PRODF1*(node_rho[i] * ueff / SMWH))*DELTU;
+
+			if (IUNSAT - 2 == 0)
+			{
+				if (node_p_solution[i] < 0)
+				{
+					std::cout << "UNSAT is not implemented " << std::endl;
+					SimulationControl::exitOnError("UNSAT P");
+				} else
+				{
+					node_sw[i] = 1.0;
+					node_relk[i] = 1.0;
+					BUBSAT(node_swb[i], node_relkb[i], node_p_solution[i], node_cnub[i], node_relkt[i], node_swt[i], node_sw[i],node_relk[i]);
+
+				}
+
+			} else
+			{
+				node_sw[i] = 1.0;
+				node_relk[i] = 1.0;
+				BUBSAT(node_swb[i], node_relkb[i], node_p_solution[i], node_cnub[i], node_relkt[i], node_swt[i],node_sw[i], node_relk[i]);
+			}
+		}
+		for (int i = 0; i < NN; i++)
+		{
+			node_pvec[i] = node_p_solution[i];
+			node_uvec[i] = node_u_solution[i];
+		}
+		goto BEGIN_TIMESTEP;
+}
+
+
+void Storage::BCTIME()
+{
+	int NSOUI = NSOU - 1;
+	int NSOPI = NSOP - 1;
+
+	if (IPBCT < 0)
+	{
+		for (int i = 0; i < NPBC; i++)
+		{
+			int v = IPBC[i];
+			if (v<0)
+			{
+				IBCPBC[i] = -1;
+			}
+		}
+	}
+
+	if (IUBCT < 0)
+	{
+		for (int i = 0; i < NUBC; i++)
+		{
+			int v = IPBC[i+NPBC];
+			int g = IUBC[v];
+			if (g < 0)
+			{
+				IBCUBC[v] = -1;
+			}
+		}
+	}
+
+	if (IQSOPT < 0)
+	{
+		for (int i = 0; i < NSOPI; i++)
+		{
+			int v = IQSOP[i];
+			if (v < 0)
+			{
+				IBCSOP[i] = -1;
+			}
+		}
+	}
+
+	if (IQSOUT < 0)
+	{
+		for (int i = 0; i < NSOUI; i++)
+		{
+			int v = IQSOP[i];
+			if (v < 0)
+			{
+				IBCSOU[i] = -1;
+			}
+		}
+	}
+}
+
+void Storage::BCSTEP()
+{
+	if (ITBCS != 0)
+	{
+		BCSFL[ITBCS] = false;
+		BCSTR[ITBCS] = false;
+	}
+
+	bool found = false;
+	Bcs * bcs = nullptr;
+	for (int i = 0; i < bcsContainer.size(); i++)
+	{
+		if (ITBCS == bcsContainer[i]->getTimeStep())
+		{
+			found = true;
+			bcs = bcsContainer[i];
+			break;
+		}
+
+	}
+	if (found){
+		int NBCN1, NSOP1, NSOU1, NSOPI, NSOUI, NSOPI1, NSOUI1;
+		bool usefl, anyfl, anytr, setfl, settr;
+		NBCN1 = bcs->getNumberOfPBC() + bcs->getNumberOfUBC() + 1;
+		NSOP1 = bcs->getNumberOfQINC() + 1;
+		NSOU1 = bcs->getNumberOfQUINC() + 1;
+		NSOPI = NSOP - 1;
+		NSOUI = NSOU - 1;
+		NSOPI1 = NSOP1 - 1;
+		NSOUI1 = NSOU1 - 1;
+
+		usefl = ((ISSFLO != 0) && (ITBCS == 0)) || ((ISSFLO == 0) && (ITBCS != 0));
+		anyfl = (NSOPI1 + bcs->getNumberOfPBC()) > 0;
+		anytr = (NSOUI1 + bcs->getNumberOfUBC()) > 0;
+		BCSFL[ITBCS] = usefl && anyfl;
+		BCSTR[ITBCS] = anytr;
+		setfl = SETBCS && BCSFL[ITBCS];
+		settr = SETBCS && BCSTR[ITBCS];
+
+		if ((bcs->getNumberOfQINC() + bcs->getNumberOfQUINC()) > 0)
+		{
+			/*double * qin1 = new double[NN];
+			double * uin1 = new double[NN];
+			double * quin1 = new double[NN];
+			double * iqsop1 = new double[NSOP1];
+			double * iqsou1 = new double[NSOU1];
+			
+			delete[] qin1;
+			delete[] uin1;
+			delete[] quin1;
+			delete[] iqsop1;
+			delete[] iqsou1;*/
+			for (int i = 0; i < NSOPI1; i++)
+			{
+				int IQP = -1;
+				int nod_ = bcs->getNodes()[i];
+				for (int j = 0; j < NSOPI; j++)
+				{
+					int nod__ = IQSOP[j];
+					if (abs(nod_) == abs(nod__))
+					{
+						IQP = j;
+						break;
+					}
+				}
+				if (IQP == -1)
+					SimulationControl::exitOnError("BCS-3-2");
+
+				if (setfl)
+				{
+					if (nod_ > 0)
+					{
+						node_qin[nod_ - 1] = bcs->getQINC()[i];
+						if (node_qin[nod_ - 1] > 0.0)
+							node_uin[nod_ - 1] = bcs->getUINC()[i];
+						IBCSOP[IQP] = 1;
+					} else
+					{
+						node_qin[-nod_ - 1] = 0.0;
+						IBCSOP[IQP] = 2;
+					}
+				}
+			}
+
+			for (int i = 0; i < NSOUI1; i++)
+			{
+				int IQU = -1;
+				int nod_ = bcs->getNodes()[i];
+				for (int j = 0; j < NSOUI; j++)
+				{
+					int nod__ = IQSOU[j];
+					if (abs(nod_) == abs(nod__))
+					{
+						IQU = j;
+						break;
+					}
+				}
+				if (IQU == -1)
+					SimulationControl::exitOnError("BCS-4-2");
+
+				if (settr)
+				{
+					if (nod_ > 0)
+					{
+						node_quin[nod_ - 1] = bcs->getQUINC()[i];
+						IBCSOU[IQU] = 1;
+					}
+					else
+					{
+						node_quin[-nod_ - 1] = 0.0;
+						IBCSOU[IQU] = 2;
+					}
+				}
+			}
+
+		}
+
+		if (NBCN1 - 1 != 0)
+		{
+		/*	double * IPBC1 = new double[NBCN1];
+			double * PBC1 = new double[NBCN1];
+			double * IUBC1 = new double[NBCN1];
+			double * UBC1 = new double[NBCN1];
+
+			delete[] IPBC1;
+			delete[] PBC1;
+			delete[] IUBC1;
+			delete[] UBC1;*/
+			for (int i = 0; i < bcs->getNumberOfPBC(); i++)
+			{
+				int IP = -1;
+				int nod_ = bcs->getNodes()[i];
+				for (int j = 0; j < NPBC; j++)
+				{
+					int nod__ = IPBC[j];
+					if (abs(nod_) == abs(nod__))
+					{
+						IP = j;
+						break;
+					}
+				}
+				if (IP == -1)
+					SimulationControl::exitOnError("BCS-5-2");
+
+				if (setfl)
+				{
+					if (nod_ > 0)
+					{
+						node_pbc[nod_ - 1] = bcs->getPBC()[i];
+						node_ubc[nod_ - 1] = bcs->getUBC()[i];
+						GNUP1[IP] = GNUP;
+						IBCPBC[IP] = 1;
+					}
+					else
+					{
+						GNUP1[IP] = 0.0;
+						IBCPBC[IP] = 2;
+					}
+				}
+			}
+
+			for (int i = 0; i < bcs->getNumberOfUBC(); i++)
+			{
+				int IP = -1;
+				int nod_ = bcs->getNodes()[i];
+				for (int j = 0; j < NPBC; j++)
+				{
+					int nod__ = IUBC[j];
+					if (abs(nod_) == abs(nod__))
+					{
+						IP = j;
+						break;
+					}
+				}
+				if (IP == -1)
+					SimulationControl::exitOnError("BCS-5-2");
+
+				if (settr)
+				{
+					if (nod_ > 0)
+					{
+						node_ubc[nod_ - 1] = bcs->getUBC()[i];
+						GNUU1[IP] = GNUU;
+						IBCUBC[IP] = 1;
+					}
+					else
+					{
+						GNUU1[IP] = 0.0;
+						IBCUBC[IP] = 2;
+					}
+				}
+			}
+		}
+	}
+
+
+
+
+
+}
+
+void Storage::ADSORB()
+{
+	
+}
+
+void Storage::ELEMN3()
+{
+	int ivcalc, jvcalc, kvcalc;
+	ivcalc = jvcalc = kvcalc = 0;
+	if ((ML != 2) && (ITER == 1))
+		ivcalc = 1;
+	if (IT == 1) ivcalc = 1;
+	if ((KVEL == 1))
+		jvcalc = 1;
+
+	kvcalc = ivcalc + jvcalc;
+
+	if (INTIM)
+	{
+		INTIM = false;
+		for (int i = 0; i < NE; i++)
+		{
+			double * DET = new double[8];
+			double * F = new double[8];
+			double * W = new double[8];
+			double rgxg[8], rgyg[8], rgzg[8];
+			
+			double DFDXG[8][8], DFDYG[8][8], DFDZG[8][8], DWDXG[8][8], DWDYG[8][8], DWDZG[8][8];
+			for (int j = 0; j < N48; j++)
+			{
+				double xloc = GXLOC[j];
+				double yloc = GYLOC[j];
+				double zloc = GZLOC[j];
+				double swbg[8];
+				double relkbg[8];
+				double porg[8];
+				double swtg[8];
+				double relktg[8];
+				double viscg[8], rhog[8];
+				//std::vector<double> CJ;
+				double * CJ = new double[9]{0};
+				double vxg[8], vyg[8], vzg[8], vgmag[8];
+				BASIS3(0, i, xloc, yloc, zloc, F,W, DET[j], CJ,DFDXG[i],DFDYG[i],DFDZG[i],DWDXG[i],DWDYG[i],DWDZG[i],swbg[i],relkbg[i],vxg[i],vyg[i],vzg[i],vgmag[i],swtg[i],relktg[i],viscg[i],rhog[i],rgxg[i],rgyg[i],rgzg[i],porg[i]);
+				el_gxsi[i][j] = CJ[0] * GRAVX + CJ[1] * GRAVY + CJ[2] * GRAVZ;
+				el_geta[i][j] = CJ[3] * GRAVX + CJ[4] * GRAVY + CJ[5] * GRAVZ;
+				el_gzet[i][j] = CJ[6] * GRAVX + CJ[7] * GRAVY + CJ[8] * GRAVZ;
+				delete[] CJ;
+				if (DET[j] <= 0)
+				{
+					ISTOP = ISTOP + 1;
+					std::cout << "Determinant of the jacobian at node " << (incidenceContainer[i]).second[j] << " in element "
+						<< i + 1 << " is negative or zero " << DET[j] << std::endl;
+				}
+			}
+			delete[] DET;
+			delete[] F;
+			delete[] W;
+		}
+	}
+
+	if (ISTOP != 0)
+	{
+		SimulationControl::exitOnError("INP-14B,22-1");
+	}
+
+	if (IUNSAT != 0)
+		IUNSAT = 2;
+	// Main Element Loop
+	for (int l = 0; l < NE; l++)
+	{
+		double XIX, YIY, ZIZ;
+		XIX = YIY = ZIZ = -1.0;
+		int kg = 0;
+
+		double F[8][8];
+		double W[8][8];
+
+		double CJ[9];
+		double DET[8];
+		double DWDXG[8][8];
+		double DWDYG[8][8];
+		double DWDZG[8][8];
+		double DFDXG[8][8];
+		double DFDYG[8][8];
+		double DFDZG[8][8];
+		double swbg[8];
+		double relkbg[8];
+		double swtg[8];
+		double viscg[8];
+		double rhog[8];
+		double relktg[8];
+		double rgxg[8], rgyg[8], rgzg[8];
+		double vole[8], dflowe[8], bflowe[8][8];
+		double vxg[8], vyg[8], vzg[8], vgmag[8];
+		double porg[8];
+		for (int izl = 0; izl < 2; izl++){
+			for (int iyl = 0; iyl < 2; iyl++){
+				for (int ixl = 0; ixl < 2; ixl++)
+				{
+					double xloc = XIX * GLOC;
+					double yloc = YIY * GLOC;
+					double zloc = ZIZ * GLOC;
+					BASIS3(1, l, xloc, yloc, zloc, F[kg], W[kg], DET[kg], CJ, DFDXG[kg], DFDYG[kg], DFDZG[kg], DWDXG[kg], DWDYG[kg], DWDZG[kg], swbg[kg], relkbg[kg], vxg[kg], vyg[kg], vzg[kg], vgmag[kg], swtg[kg], relktg[kg], viscg[kg], rhog[kg], rgxg[kg], rgyg[kg], rgzg[kg], porg[kg]);
+					kg++;
+					XIX = -XIX;
+				}
+				YIY = -YIY;
+			}
+			ZIZ = -ZIZ;
+		}
+		double tDFDXG[8][8], tDFDYG[8][8], tDFDZG[8][8], tDWDXG[8][8], tDWDYG[8][8], tDWDZG[8][8];
+		for (int i = 0; i < 8; i++)
+		{
+			for (int j = 0; j < 8; j++)
+			{
+				tDFDXG[i][j] = DFDXG[j][i];
+				tDFDYG[i][j] = DFDYG[j][i];
+				tDFDZG[i][j] = DFDZG[j][i];
+				tDWDXG[i][j] = DWDXG[j][i];
+				tDWDYG[i][j] = DWDYG[j][i];
+				tDWDZG[i][j] = DWDZG[j][i];
+
+			}
+			
+		}
+		
+		//calculate velocity at element centroid
+		if (kvcalc - 2 == 0)
+		{
+			double axsum, aysum, azsum;
+			axsum = aysum = azsum = 0.0;
+			for (int i = 0; i < 8; i++)
+			{
+				axsum = axsum + vxg[i];
+				aysum = aysum + vyg[i];
+				azsum = azsum + vzg[i];
+			}
+			el_vmag[l] = sqrt(axsum*axsum + aysum + aysum + azsum + azsum);
+			if (el_vmag[l] != 0.0)
+			{
+				el_vang2[l] = asin(azsum / el_vmag[l]) *5.5729577951308232e-1;
+				el_vmag[l] = el_vmag[l] * 0.125;
+				el_vang1[l] = atan2(aysum, axsum)*5.5729577951308232e-1;
+			}
+			else
+			{
+				el_vang1[l] = 0.0;
+				el_vang2[l] = 0.0;
+			}
+
+		}
+
+
+		// calculate parameters for fluid mass balance at gauss points
+
+		if (ML == 2)
+			goto u_only;
+
+		double SWTEST = 0.0;
+		double RXXG[8], RXYG[8], RXZG[8], RYXG[8], RYYG[8], RYZG[8], RZXG[8], RZYG[8], RZZG[8];
+		for (int i = 0; i < 8; i++)
+		{
+			SWTEST = SWTEST + swtg[i];
+			double ROMG = rhog[i] * relktg[i] / viscg[i];
+			RXXG[i] = el_permxx[l] * ROMG;
+			RXYG[i] = el_permxy[l] * ROMG;
+			RXZG[i] = el_permxz[l] * ROMG;
+			RYXG[i] = el_permyx[l] * ROMG;
+			RYYG[i] = el_permyy[l] * ROMG;
+			RYZG[i] = el_permyz[l] * ROMG;
+			RZXG[i] = el_permzx[l] * ROMG;
+			RZYG[i] = el_permzy[l] * ROMG;
+			RZZG[i] = el_permzz[l] * ROMG;
+		}
+
+		// integrate fluid mass balance in an unsaturated element using asymetric weighting functions
+		if (UP <= 1e-6)
+			goto symmetric;
+
+		if (SWTEST - 3.999 >= 0)
+			goto symmetric;
+
+		for (int i = 0; i < 8; i++)
+		{
+			vole[i] = 0.0;
+			dflowe[i] = 0.0;
+			for (int j = 0; j < 8; j++)
+			{
+				bflowe[i][j] = 0.0;
+			}
+		}
+
+		for (int kg = 0; kg < 8; kg++)
+		{
+			double rxxgd = RXXG[kg] * DET[kg];
+			double rxygd = RXYG[kg] * DET[kg];
+			double rxzgd = RXZG[kg] * DET[kg];
+			double ryxgd = RYXG[kg] * DET[kg];
+			double ryygd = RYYG[kg] * DET[kg];
+			double ryzgd = RYZG[kg] * DET[kg];
+			double rzxgd = RZXG[kg] * DET[kg];
+			double rzygd = RZYG[kg] * DET[kg];
+			double rzzgd = RZZG[kg] * DET[kg];
+			double rdrx = rxxgd*rgxg[kg] + rxygd*rgyg[kg] + rxzgd*rgzg[kg];
+			double rdry = ryxgd*rgxg[kg] + ryygd*rgyg[kg] + ryzgd*rgzg[kg];
+			double rdrz = rzxgd*rgxg[kg] + rzygd*rgyg[kg] + rzzgd*rgzg[kg];
+			for (int i = 0; i < 8; i++)
+			{
+			//	vole[i] = vole[i] + F[i][kg] * DET[kg];
+			//	dflowe[i] = dflowe[i] + rdrx*DWDXG[i][kg] + rdry*DWDYG[i][kg] + rdrz*DWDZG[i][kg];
+				vole[i] = vole[i] + F[kg][i] * DET[kg];
+				dflowe[i] = dflowe[i] + rdrx*tDWDXG[i][kg] + rdry*tDWDYG[i][kg] + rdrz*tDWDZG[i][kg];
+			}
+
+			for (int j = 0; j < 8; j++)
+			{
+				/*double rddfjx = rxxgd*DFDXG[j][kg] + rxygd*DFDYG[j][kg] + rxzgd*DFDZG[j][kg];
+				double rddfjy = ryxgd*DFDXG[j][kg] + ryygd*DFDYG[j][kg] + ryzgd*DFDZG[j][kg];
+				double rddfjz = rzxgd*DFDXG[j][kg] + rzygd*DFDYG[j][kg] + rzzgd*DFDZG[j][kg];*/
+				double rddfjx = rxxgd*tDFDXG[j][kg] + rxygd*tDFDYG[j][kg] + rxzgd*tDFDZG[j][kg];
+				double rddfjy = ryxgd*tDFDXG[j][kg] + ryygd*tDFDYG[j][kg] + ryzgd*tDFDZG[j][kg];
+				double rddfjz = rzxgd*tDFDXG[j][kg] + rzygd*tDFDYG[j][kg] + rzzgd*tDFDZG[j][kg];
+				for (int p = 0; p < 8; p++){
+					//	bflowe[p][j] = bflowe[p][j] + DWDXG[p][kg] * rddfjx + DWDYG[p][kg] * rddfjy + DWDZG[p][kg] * rddfjz;
+				bflowe[p][j] = bflowe[p][j] + DWDXG[p][kg] * rddfjx + DWDYG[p][kg] * rddfjy + DWDZG[p][kg] * rddfjz;
+				}
+			}
+		}
+		goto check;
+
+	symmetric:
+
+		for (int i = 0; i < 8; i++)
+		{
+			vole[i] = 0.0;
+			dflowe[i] = 0.0;
+			for (int j = 0; j < 8; j++)
+			{
+				bflowe[i][j] = 0.0;
+			}
+		}
+		for (int kg = 0; kg < 8; kg++)
+		{
+			double rxxgd = RXXG[kg] * DET[kg];
+			double rxygd = RXYG[kg] * DET[kg];
+			double rxzgd = RXZG[kg] * DET[kg];
+			double ryxgd = RYXG[kg] * DET[kg];
+			double ryygd = RYYG[kg] * DET[kg];
+			double ryzgd = RYZG[kg] * DET[kg];
+			double rzxgd = RZXG[kg] * DET[kg];
+			double rzygd = RZYG[kg] * DET[kg];
+			double rzzgd = RZZG[kg] * DET[kg];
+			double rdrx = rxxgd*rgxg[kg] + rxygd*rgyg[kg] + rxzgd*rgzg[kg];
+			double rdry = ryxgd*rgxg[kg] + ryygd*rgyg[kg] + ryzgd*rgzg[kg];
+			double rdrz = rzxgd*rgxg[kg] + rzygd*rgyg[kg] + rzzgd*rgzg[kg];
+			for (int i = 0; i < 8; i++)
+			{
+				/*vole[i] = vole[i] + F[i][kg] * DET[kg];
+				dflowe[i] = dflowe[i] + rdrx*DFDXG[i][kg] + rdry*DFDYG[i][kg] + rdrz*DFDZG[i][kg];*/
+				vole[i] = vole[i] + F[kg][i] * DET[kg];
+				dflowe[i] = dflowe[i] + rdrx*tDFDXG[i][kg] + rdry*tDFDYG[i][kg] + rdrz*tDFDZG[i][kg];
+			}
+
+			for (int j = 0; j < 8; j++)
+			{
+				/*double rddfjx = rxxgd*DFDXG[j][kg] + rxygd*DFDYG[j][kg] + rxzgd*DFDZG[j][kg];
+				double rddfjy = ryxgd*DFDXG[j][kg] + ryygd*DFDYG[j][kg] + ryzgd*DFDZG[j][kg];
+				double rddfjz = rzxgd*DFDXG[j][kg] + rzygd*DFDYG[j][kg] + rzzgd*DFDZG[j][kg];*/
+				double rddfjx = rxxgd*tDFDXG[j][kg] + rxygd*tDFDYG[j][kg] + rxzgd*tDFDZG[j][kg];
+				double rddfjy = ryxgd*tDFDXG[j][kg] + ryygd*tDFDYG[j][kg] + ryzgd*tDFDZG[j][kg];
+				double rddfjz = rzxgd*tDFDXG[j][kg] + rzygd*tDFDYG[j][kg] + rzzgd*tDFDZG[j][kg];
+				for (int p = 0; p < 8; p++)
+				{
+					//bflowe[p][j] = bflowe[p][j] + DFDXG[p][kg] * rddfjx + DFDYG[p][kg] * rddfjy + DFDZG[p][kg] * rddfjz;
+					bflowe[p][j] = bflowe[p][j] + tDFDXG[p][kg] * rddfjx + tDFDYG[p][kg] * rddfjy + tDFDZG[p][kg] * rddfjz;
+				}
+					
+			}
+		}
+
+	check:
+		if (ML == 1)
+			goto send;
+	u_only:
+		if (NOUMAT == 1)
+			goto send;
+
+		// calculate parameters for energy balanca or solute mass balance at gauss points
+		double EXG[8], EYG[8], EZG[8];
+		double dxxg, dxyg, dxzg, dyxg, dyyg, dyzg, dzxg, dzyg, dzzg;
+		double eswg, rhocwg, esrcg;
+		double bxxg[8], bxyg[8], bxzg[8];
+		double byxg[8], byyg[8], byzg[8];
+		double bzxg[8], bzyg[8], bzzg[8];
+		//add difusion and dispersion terms to total dispersion tensor
+		for (int kg = 0; kg < 8; kg++)
+		{
+			eswg = porg[kg] * swtg[kg];
+			rhocwg = rhog[kg] * CW;
+			esrcg = eswg * rhocwg;
+			if (vgmag[kg] <= 0)
+			{
+				EXG[kg] = 0.0;
+				EYG[kg] = 0.0;
+				EZG[kg] = 0.0;
+				dxxg = dxyg = dxzg = dyxg = dyyg = dyzg = dzxg = dzyg = dzzg = 0.0;
+
+			}
+			else
+			{
+				EXG[kg] = esrcg*vxg[kg];
+				EYG[kg] = esrcg*vyg[kg];
+				EZG[kg] = esrcg*vzg[kg];
+				DISPR3(vxg[kg], vyg[kg], vzg[kg], vgmag[kg], el_pangl1[l], el_pangl2[l], el_pangl3[l], el_almax[l], el_almid[l], el_almin[l],
+					el_atmax[l], el_atmid[l], el_atmin[l], dxxg, dxyg, dxzg, dyxg, dyyg, dyzg, dzxg, dzyg, dzzg);
+			}
+			double ESE;
+			if (ME == 1)
+				ESE = eswg*SIGMAW + (1.0 - porg[kg])*SIGMAS;
+			else
+				ESE = esrcg*SIGMAW + (1.0 - porg[kg])*rhocwg*SIGMAS;
+
+			bxxg[kg] = esrcg*dxxg + ESE;
+			bxyg[kg] = esrcg*dxyg;
+			bxzg[kg] = esrcg*dxzg;
+			byxg[kg] = esrcg*dyxg;
+			byyg[kg] = esrcg*dyyg + ESE;
+			byzg[kg] = esrcg*dyzg;
+			bzxg[kg] = esrcg*dzxg;
+			bzyg[kg] = esrcg*dzyg;
+			bzzg[kg] = esrcg*dzzg + ESE;
+
+		}
+		double BTRANE[8][8];
+		double DTRANE[8][8];
+		for (int i = 0; i < 8; i++){
+			for (int j = 0; j < 8; j++)
+			{
+				BTRANE[i][j] = 0.0;
+				DTRANE[i][j] = 0.0;
+			}
+		}
+
+		for (int kg = 0; kg < 8; kg++)
+		{
+			double BXXGD = bxxg[kg] * DET[kg];
+			double BXYGD = bxyg[kg] * DET[kg];
+			double BXZGD = bxzg[kg] * DET[kg];
+			double BYXGD = byxg[kg] * DET[kg];
+			double BYYGD = byyg[kg] * DET[kg];
+			double BYZGD = byzg[kg] * DET[kg];
+			double BZXGD = bzxg[kg] * DET[kg];
+			double BZYGD = bzyg[kg] * DET[kg];
+			double BZZGD = bzzg[kg] * DET[kg];
+			double EXGD = EXG[kg] * DET[kg];
+			double EYGD = EYG[kg] * DET[kg];
+			double EZGD = EZG[kg] * DET[kg];
+			for (int j = 0; j < 8; j++)
+			{
+				/*double bddfjx = BXXGD*DFDXG[j][kg] + BXYGD*DFDYG[j][kg] + BXZGD*DFDZG[j][kg];
+				double bddfjy = BYXGD*DFDXG[j][kg] + BYYGD*DFDYG[j][kg] + BYZGD*DFDZG[j][kg];
+				double bddfjz = BZXGD*DFDXG[j][kg] + BZYGD*DFDYG[j][kg] + BZZGD*DFDZG[j][kg];
+				double eddfj = EXGD*DFDXG[j][kg] + EYGD*DFDYG[j][kg] + EZGD*DFDZG[j][kg];*/
+				double bddfjx = BXXGD*tDFDXG[j][kg] + BXYGD*tDFDYG[j][kg] + BXZGD*tDFDZG[j][kg];
+				double bddfjy = BYXGD*tDFDXG[j][kg] + BYYGD*tDFDYG[j][kg] + BYZGD*tDFDZG[j][kg];
+				double bddfjz = BZXGD*tDFDXG[j][kg] + BZYGD*tDFDYG[j][kg] + BZZGD*tDFDZG[j][kg];
+				double eddfj = EXGD*tDFDXG[j][kg] + EYGD*tDFDYG[j][kg] + EZGD*tDFDZG[j][kg];
+				for (int i = 0; i < 8; i++)
+				{
+					/*BTRANE[i][j] = BTRANE[i][j] + DFDXG[i][kg] * bddfjx + DFDYG[i][kg] * bddfjy + DFDZG[i][kg] * bddfjz;
+					DTRANE[i][j] = DTRANE[i][j] + eddfj*W[i][kg];*/
+					BTRANE[i][j] = BTRANE[i][j] + tDFDXG[i][kg] * bddfjx + tDFDYG[i][kg] * bddfjy + tDFDZG[i][kg] * bddfjz;
+					DTRANE[i][j] = DTRANE[i][j] + eddfj*W[kg][i];
+				}
+			}
+		}
+
+		send:
+			if (KSOLVP == 0)
+			{
+				
+			} else
+			{
+				GLOCOL(l,vole,bflowe,dflowe,BTRANE,DTRANE);
+			}
+	}
+}
+
+void Storage::ELEMN2()
+{
+	
+}
+
+void Storage::NODAL()
+{
+	int JMID, IMID;
+	if (IUNSAT != 0)
+		IUNSAT = 1;
+
+	if (KSOLVP == 0)
+		JMID = NBHALF;
+	else
+		JMID = 0;
+
+	if (NOUMAT < 1)
+	{
+		for (int i = 0; i < NN; i++)
+		{
+			if (IUNSAT - 1 == 0)
+			{
+				if (node_piter[i] < 0)
+				{
+					std::cout << "UNSATURATED is not implemented" << std::endl;
+					SimulationControl::exitOnError("UNSATURATED");
+				}
+				else
+				{
+					node_sw[i] = 1.0;
+					node_dswdp[i] = 0.0;
+				}
+			}
+		}
+
+
+		for (int i = 0; i < NN; i++)
+		{
+			BUBSAT(node_swb[i], node_relkb[i], node_piter[i], node_cnub[i], node_relkt[i], node_swt[i], node_sw[i], node_relk[i]);
+		}
+
+		for (int i = 0; i < NN; i++)
+		{
+			node_rho[i] = RHOW0 + DRWDU*(node_uiter[i] - URHOW0);
+		}
+	}
+
+
+		for (int i = 0; i < NN; i++)
+		{
+			if (KSOLVP == 0)
+				IMID = i;
+			else
+				IMID = JA[i];
+
+			double SWRHON = node_swt[i] * node_rho[i];
+			if (ML != 2)
+			{
+				double afln = (1 - ISSFLO / 2) * (SWRHON * node_sop[i] + node_por[i] * node_rho[i] * node_swb[i] * (node_dswdp[i] + node_sw[i] * (1.0 - node_swb[i]) / (PSTAR + node_piter[i])))*node_vol[i] / (TMAX - TSTART);//DELTP;
+				double cfln = node_por[i] * node_swt[i] * DRWDU*node_vol[i];
+				double dudt = (1 - ISSFLO / 2)*(node_um1[i] - node_um2[i]) / DLTUM1;
+				cfln = cfln * dudt - (node_sw[i] * GCONST*TEMP*node_por[i] * node_rho[i] * ((node_swb[i] * node_swb[i]) / (PSTAR + node_piter[i]))*(-0.5*PRODF1*(node_rho[i] * node_uiter[i] / SMWH)))*node_vol[i];
+				PMAT[IMID] = PMAT[IMID] + afln;
+				node_p_rhs[i] = node_p_rhs[i] - cfln + afln * node_pm1[i] + node_qin[i];
+			}
+			if (ML == 1)
+				continue;
+
+			double EPRS = (1.0 - node_por[i])*RHOS;
+			double atrn = (1 - ISSTRA)*(node_por[i] * SWRHON*CW + EPRS*node_cs1[i])*node_vol[i] / DELTU;
+			double gtrn = node_por[i] * SWRHON*PRODF1*node_vol[i];
+			double gsv = EPRS*PRODS1*node_vol[i];
+			double gsltrn = gsv * node_sl[i];
+			double gsrtrn = gsv * node_sr[i];
+			double etrn = (node_por[i] * SWRHON*PRODF0 + EPRS*PRODS0)*node_vol[i];
+			double qur = 0.0;
+			double qul = 0.0;
+
+			if (node_qinitr[i]<1)
+			{
+				qul = -CW*node_qinitr[i];
+				qur = -qul*node_uin[i];
+			}
+			if (NOUMAT != 1)
+				UMAT[IMID] = UMAT[IMID] + atrn - gtrn - gsltrn - qul;
+			node_u_rhs[i] = node_u_rhs[i] + atrn*node_um1[i] + etrn + gsrtrn + qur + node_quin[i];
+		}
+
+	
+}
+
+void Storage::BC()
+{
+	int JMID, IMID;
+	if (KSOLVP == 0)
+		JMID = NBHALF;
+	else
+		JMID = 1;
+
+		if (NPBC != 0)
+		{
+			for (int ip = 0; ip < NPBC; ip++)
+			{
+				int i = abs(IPBC[ip]);
+				i = i - 1;
+				if (KSOLVP == 0)
+					IMID = i;
+				else
+					IMID = JA[i];
+
+				if (ML < 2)
+				{
+					double gpinl = -GNUP1[ip];
+					double gpinr = GNUP1[ip] * node_pbc[ip];
+					PMAT[IMID] = PMAT[IMID] - gpinl;
+					node_p_rhs[i] = node_p_rhs[i] + gpinr;
+				}
+				if (ML == 1)
+					continue;
+
+				double gur = 0.0;
+				double gul = 0.0;
+				if (QPLITR[ip] < 1)
+				{
+					gul = -CW*QPLITR[ip];
+					gur = -gul*node_ubc[ip];
+				}
+				if (NOUMAT != 1)
+					UMAT[IMID] = UMAT[IMID] - gul;
+				node_u_rhs[i] = node_u_rhs[i] + gur;
+			}
+		}
+}
+
+void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, double F[],double W[], double& DET, double CJ[],
+	double DFDXG[],double DFDYG[],double DFDZG[],double DWDXG[],double DWDYG[],double DWDZG[],double& swbg,double& relkbg,
+	double &vxg,double & vyg,double&vzg,double&vgmag,double& swtg,double&relktg,double &viscg,double& rhog,double&rgxg,double&rgyg,double&rgzg,double& porg)
+{
+	double XIIX[8] = { -1.0, +1.0, +1.0, -1.0, -1.0, +1.0, +1.0, -1.0 };
+	double YIIY[8] = { -1.0, -1.0, +1.0, +1.0, -1.0, -1.0, +1.0, +1.0 };
+	double ZIIZ[8] = { -1.0, -1.0, -1.0, -1.0, +1.0, +1.0, +1.0, +1.0 };
+
+	double XF[2] = { 1.0 - XLOC, 1.0 + XLOC };
+	double YF[2] = { 1.0 - YLOC, 1.0 + YLOC };
+	double ZF[2] = { 1.0 - ZLOC, 1.0 + ZLOC };
+
+	double FX[8] = { XF[0], XF[1], XF[1], XF[0], XF[0], XF[1], XF[1], XF[0] };
+	double FY[8] = { YF[0], YF[0], YF[1], YF[1], YF[0], YF[0], YF[1], YF[1] };
+	double FZ[8] = { ZF[0], ZF[0], ZF[0], ZF[0], ZF[1], ZF[1], ZF[1], ZF[1] };
+	double * DFDXL = new double[8]{};
+	double * DFDYL = new double[8]{};
+	double * DFDZL = new double[8]{};
+	for (int i = 0; i < 8; i++)
+		F[i] = 0.125 *FX[i] * FY[i] * FZ[i];
+
+	for (int i = 0; i < 8; i++)
+	{
+		DFDXL[i] = XIIX[i] * 0.125 * FY[i] * FZ[i];
+		DFDYL[i] = YIIY[i] * 0.125 * FX[i] * FZ[i];
+		DFDZL[i] = ZIIZ[i] * 0.125 * FX[i] * FY[i];
+	}
+
+	//std::vector<double> CJ(9, 0);
+	for (int i = 0; i < 9; i++)
+		CJ[i] = 0.0;
+
+	for (int il = 0; il < 8; il++)
+	{
+		int ii = L * 8 + il;
+		int i = incidence_vector[ii];
+		i = i - 1;
+		CJ[0] = CJ[0] + DFDXL[il] * node_x[i];
+		CJ[1] = CJ[1] + DFDXL[il] * node_y[i];
+		CJ[2] = CJ[2] + DFDXL[il] * node_z[i];
+
+
+		CJ[3] = CJ[3] + DFDYL[il] * node_x[i];
+		CJ[4] = CJ[4] + DFDYL[il] * node_y[i];
+		CJ[5] = CJ[5] + DFDYL[il] * node_z[i];
+
+		CJ[6] = CJ[6] + DFDZL[il] * node_x[i];
+		CJ[7] = CJ[7] + DFDZL[il] * node_y[i];
+		CJ[8] = CJ[8] + DFDZL[il] * node_z[i];
+	}
+
+	DET = CJ[0] * (CJ[4] * CJ[8] - CJ[7] * CJ[5]) - CJ[3] * (CJ[1] * CJ[8] - CJ[7] * CJ[2]) +
+		CJ[6] * (CJ[1] * CJ[5] - CJ[4] * CJ[2]);
+	//cj = CJ;
+	if (ICALL == 0){
+		delete[] DFDXL;
+		delete[] DFDYL;
+		delete[] DFDZL;
+		return;
+	}
+
+	double ODET = 1.0 / DET;
+	double * CIJ = new double[9]{0};
+
+	CIJ[0] = +ODET * (CJ[4] * CJ[8] - CJ[7] * CJ[5]);
+	CIJ[1] = -ODET * (CJ[1] * CJ[8] - CJ[7] * CJ[2]);
+	CIJ[2] = +ODET * (CJ[1] * CJ[5] - CJ[4] * CJ[2]);
+
+	CIJ[3] = -ODET * (CJ[3] * CJ[8] - CJ[6] * CJ[5]);
+	CIJ[4] = +ODET * (CJ[0] * CJ[8] - CJ[6] * CJ[2]);
+	CIJ[5] = -ODET * (CJ[0] * CJ[5] - CJ[3] * CJ[2]);
+
+	CIJ[6] = +ODET * (CJ[3] * CJ[7] - CJ[6] * CJ[3]);
+	CIJ[7] = -ODET * (CJ[0] * CJ[7] - CJ[6] * CJ[1]);
+	CIJ[8] = +ODET * (CJ[0] * CJ[4] - CJ[3] * CJ[1]);
+
+	// CALCULATE DERIVATIVES WRT TO GLOBAL COORDINATES
+	for (int i = 0; i < 8; i++)
+	{
+		DFDXG[i] = CIJ[0] * DFDXL[i] + CIJ[1] * DFDYL[i] + CIJ[2] * DFDZL[i];
+		DFDYG[i] = CIJ[3] * DFDXL[i] + CIJ[4] * DFDYL[i] + CIJ[5] * DFDZL[i];
+		DFDZG[i] = CIJ[6] * DFDXL[i] + CIJ[7] * DFDYL[i] + CIJ[8] * DFDZL[i];
+	}
+
+	// Calculate consistent components of (RHO*GRAV) term in local coordinates
+	double RGXL, RGYL, RGZL, RGXLM1, RGYLM1, RGZLM1;
+	RGXL = RGYL = RGZL = RGXLM1= RGYLM1 = RGZLM1 = 0;
+	for (int il = 0; il < 8; il++)
+	{
+		int ii = L * 8 + il;
+		int i = incidence_vector[ii];
+		i = i - 1;
+		double ADFDXL = abs(DFDXL[il]);
+		double ADFDYL = abs(DFDYL[il]);
+		double ADFDZL = abs(DFDZL[il]);
+		RGXL = RGXL + node_rcit[i] * el_gxsi[L][il] * ADFDXL;
+		RGYL = RGYL + node_rcit[i] * el_geta[L][il] * ADFDYL;
+		RGZL = RGZL + node_rcit[i] * el_gzet[L][il] * ADFDZL;
+		RGXLM1 = RGXLM1 + node_rcitm1[i] * el_gxsi[L][il] * ADFDXL;
+		RGYLM1 = RGYLM1 + node_rcitm1[i] * el_geta[L][il] * ADFDYL;
+		RGZLM1 = RGZLM1 + node_rcitm1[i] * el_gzet[L][il] * ADFDZL;
+	}
+
+	// transform consistent components to global coordinates
+	rgxg = CIJ[0] * RGXL + CIJ[1] * RGYL + CIJ[2] * RGZL;
+	rgyg = CIJ[3] * RGXL + CIJ[4] * RGYL + CIJ[5] * RGZL;
+	rgzg = CIJ[6] * RGXL + CIJ[7] * RGYL + CIJ[8] * RGZL;
+
+	double RGXGM1 = CIJ[0] * RGXLM1 + CIJ[1] * RGYLM1 + CIJ[2] * RGZLM1;
+	double RGYGM1 = CIJ[3] * RGXLM1 + CIJ[4] * RGYLM1 + CIJ[5] * RGZLM1;
+	double RGZGM1 = CIJ[6] * RGXLM1 + CIJ[7] * RGYLM1 + CIJ[8] * RGZLM1;
+
+	// calculate Parameter values at this location
+	double piterg, uiterg, dpdxg, dpdyg, dpdzg, cnubg;
+	piterg = uiterg = dpdxg = dpdyg = dpdzg = porg = cnubg = 0.0;
+	for (int il = 0; il < 8; il++)
+	{
+		int ii = L * 8 + il;
+		int i = incidence_vector[ii];
+		i = i - 1;
+		dpdxg = dpdxg + node_pvel[i] * DFDXG[il];
+		dpdyg = dpdyg + node_pvel[i] * DFDYG[il];
+		dpdzg = dpdzg + node_pvel[i] * DFDZG[il];
+		porg = porg + node_por[i] * F[il];
+		piterg = piterg + node_piter[i] * F[il];
+		uiterg = uiterg + node_uiter[i] * F[il];
+		cnubg = cnubg + node_cnub[i] * F[il];
+	}
+
+	// Set values for density and viscosity
+	rhog = RHOW0 + DRWDU*(uiterg - URHOW0);
+	viscg = 0;
+	if (ME == 1)
+	{
+		viscg = VISC0*239.4e-7*(pow(10.0, (248.37 / (uiterg + 133.5))));
+	}
+	else
+	{
+		viscg = VISC0;
+	}
+
+	// Set unsaturated flow parameters swg and relkg
+	double relkg, swg;
+	if (IUNSAT - 2 == 0)
+	{
+		if (piterg < 0)
+		{
+			std::cout << " unsaturated flow not implemented yet .." << std::endl;
+			SimulationControl::exitOnError();
+		}
+		else
+		{
+			swg = 1.0;
+			relkg = 1.0;
+		}
+	}
+	else
+	{
+		swg = 1.0;
+		relkg = 1.0;
+	}
+	BUBSAT(swbg,relkbg,piterg,cnubg,relktg,swtg,swg,relkg);
+
+	// Calculate consistent fluid velocities wrt global coordinates
+	double denom = 1.0 / (porg*swtg*viscg);
+	double pgx = dpdxg - RGXGM1;
+	double pgy = dpdyg - RGYGM1;
+	double pgz = dpdzg - RGZGM1;
+
+	if (dpdxg != 0)
+		if (abs(pgx / dpdxg) - 1e-10 <= 0)
+			pgx = 0.0;
+
+	if (dpdyg != 0)
+		if (abs(pgy / dpdyg) - 1e-10 <= 0)
+			pgy = 0.0;
+
+	if (dpdzg != 0)
+		if (abs(pgz / dpdzg) - 1e-10 <= 0)
+			pgz = 0.0;
+
+
+	vxg = -denom*relktg*(el_permxx[L] * pgx + el_permxy[L] * pgy + el_permxz[L] * pgz);
+	vyg = -denom*relktg*(el_permyx[L] * pgx + el_permyy[L] * pgy + el_permyz[L] * pgz);
+	vzg = -denom*relktg*(el_permzx[L] * pgx + el_permzy[L] * pgy + el_permzz[L] * pgz);
+	vgmag = sqrt(vxg*vxg + vyg*vyg + vzg*vzg);
+
+	// calculate asymmetric weighting functions
+
+	if (UP > 1.0e-6 && NOUMAT == 0)
+		goto fv;
+
+		for (int i = 0; i < 8; i++)
+		{
+			W[i] = F[i];
+			DWDXG[i] = DFDXG[i];
+			DWDYG[i] = DFDYG[i];
+			DWDZG[i] = DFDZG[i];
+		}
+		delete[] CIJ;
+		delete[] DFDXL;
+		delete[] DFDYL;
+		delete[] DFDZL;
+		return;
+	
+	fv:
+	//calculate local fluid velocities
+	double vxl = CIJ[0] * vxg + CIJ[1] * vyg + CIJ[2] * vzg;
+	double vyl = CIJ[3] * vxg + CIJ[4] * vyg + CIJ[5] * vzg;
+	double vzl = CIJ[6] * vxg + CIJ[7] * vyg + CIJ[8] * vzg;
+	double vlmag = sqrt(vxl*vxl + vyl*vyl + vzl*vzl);
+	double aa, bb, gg,xixi,yiyi,zizi;
+	aa = bb = gg = 0.0;
+	if (vlmag > 0)
+	{
+		aa = UP * vxl / vlmag;
+		bb = UP * vyl / vlmag;
+		gg = UP * vzl / vlmag;
+	}
+	xixi = 0.75*aa*XF[0] * XF[1];
+	yiyi = 0.75*bb*YF[0] * YF[1];
+	zizi = 0.75*gg*ZF[0] * ZF[1];
+	double * AFX = new double[8];
+	double * AFY = new double[8];
+	double * AFZ = new double[8];
+	for (int i = 0; i < 8; i++)
+	{
+		AFX[i] = 0.5*FX[i] + XIIX[i] * xixi;
+		AFY[i] = 0.5*FY[i] + YIIY[i] * yiyi;
+		AFZ[i] = 0.5*FZ[i] + ZIIZ[i] * zizi;
+	}
+
+	// Calculate asymmetric weighting funcs
+	for (int i = 0; i < 8; i++)
+		W[i] = AFX[i] * AFY[i] * AFZ[i];
+
+
+	double thaax = 0.5 - 1.5*aa*XLOC;
+	double thbby = 0.5 - 1.5*bb*YLOC;
+	double thggz = 0.5 - 1.5*gg*ZLOC;
+	double * XDW = new double[8];
+	double * YDW = new double[8];
+	double * ZDW = new double[8];
+
+	for (int i = 0; i < 8; i++)
+	{
+		XDW[i] = XIIX[i] * thaax;
+		YDW[i] = YIIY[i] * thbby;
+		ZDW[i] = ZIIZ[i] * thggz;
+	}
+
+	// calculate derivatives wrt local
+	double * DWDXL = new double[8];
+	double * DWDYL = new double[8];
+	double * DWDZL = new double[8];
+
+	for (int i = 0; i < 8; i++)
+	{
+		DWDXL[i] = XDW[i] * AFY[i] * AFZ[i];
+		DWDYL[i] = YDW[i] * AFX[i] * AFZ[i];
+		DWDZL[i] = ZDW[i] * AFX[i] * AFY[i];
+	}
+
+
+	// calculate derviatives wrt global;
+	for (int i = 0; i < 8; i++)
+	{
+		DWDXG[i] = CIJ[0] * DWDXL[i] + CIJ[1] * DWDYL[i] + CIJ[2] * DWDZL[i];
+		DWDYG[i] = CIJ[3] * DWDXL[i] + CIJ[4] * DWDYL[i] + CIJ[5] * DWDZL[i];
+		DWDZG[i] = CIJ[6] * DWDXL[i] + CIJ[7] * DWDYL[i] + CIJ[8] * DWDZL[i];
+	}
+
+	delete[] DWDXL;
+	delete[] DWDYL;
+	delete[] DWDZL;
+	delete[] XDW;
+	delete[] YDW;
+	delete[] ZDW;
+	delete[] AFX;
+	delete[] AFY;
+	delete[] AFZ;
+	delete[] CIJ;
+	delete[] DFDXL;
+	delete[] DFDYL;
+	delete[] DFDZL;
+}
+
+
+
+void Storage::BUBSAT(double& SWB,double& RELKB,double PRES,double CNUB,double & RELKT,double& SWT,double SW,double RELK)
+{
+	SWB = (PSTAR + PRES) / ((PSTAR + PRES) + CNUB*GCONST*TEMP);
+	RELKB = pow(SWB, 2);
+	SWT = SWB*SW;
+	RELKT = RELKB*RELK;
+}
+
+void Storage::DISPR3(double vx,double vy,double vz,double vmag,double ang1,double ang2,double ang3,
+	double ALMAX,double ALMID,double ALMIN,double ATMAX,double ATMID,double ATMIN,
+	double& dxx,double & dxy,double& dxz, double & dyx, double & dyy, double & dyz,double& dzx, double & dzy, double & dzz)
+{
+	//VX,VY,VZ,VMAG,ANG1,ANG2,ANG3,ALMAX,ALMID,ALMIN,  DISPR3.........800
+	//  ATMAX, ATMID, ATMIN, DXX, DXY, DXZ, DYX, DYY, DYZ, DZX, DZY, DZZ
+	double toliso = 1e-7;
+	double tolvrt = 1e-7;
+	double tolcir = 9.999999e-1;
+	double unx, uny, unz, wnz, wny, wnx;
+	double untxx, untyy, untzz, wntxx, wntyy, wntzz;
+	double vnx = vx / vmag;
+	double vny = vy / vmag;
+	double vnz = vz / vmag;
+	std::vector<double> vnvec(3,0);
+	std::vector<double> unvec(3, 0);
+	std::vector<double> wnvec(3, 0);
+	std::vector<double> vec(9,0);
+	bool liso = false;
+	bool tiso = false;
+	std::vector<double> AL({ALMAX,ALMID,ALMIN});
+	double almxvl = *std::max_element(AL.begin(), AL.end());
+	double almnvl = *std::min_element(AL.begin(), AL.end());
+
+	if (almxvl == 0)
+		liso = true;
+	else
+		liso = ((almxvl - almnvl) / almxvl < toliso);
+
+	double DL;
+	if (liso)
+	{
+		DL = ALMAX*vmag;
+	} else
+	{
+		
+		ROTMAT(ang1, ang2, ang3, vec);
+		ROTATE(vec, vnx, vny, vnz, vnvec);
+		vnx = vnvec[0];
+		vny = vnvec[1];
+		vnz = vnvec[2];
+
+		DL = vmag / (vnvec[0] * vnvec[0] / ALMAX + vnvec[1] * vnvec[1] / ALMID + vnvec[2] * vnvec[2] / ALMIN);
+	}
+
+	std::vector<double> AT({ATMAX,ATMID,ATMIN });
+	double atmxvl = *std::max_element(AT.begin(), AT.end());
+	double atmnvl = *std::min_element(AT.begin(), AT.end());
+	double at1, at2;
+	if (atmxvl == 0.0)
+		tiso = true;
+	else
+		tiso = ((atmxvl - atmnvl) / atmxvl < toliso);
+
+	if (tiso)
+	{
+		double term = 1.0 - vnz*vnz;
+		if (term < tolvrt)
+		{
+			unx = wny = 1.0;
+			uny = unz = wnx = wnz = 0.0;
+		} else
+		{
+			double termh = sqrt(term);
+			unx = -vny / termh;
+			uny = vnx / termh;
+			unz = 0.0;
+			wnx = -vnz*uny;
+			wny = vnz*unx;
+			wnz = termh;
+		}
+		at1 = ATMAX;
+		at2 = at1;
+	} else
+	{
+		if (liso)
+		{
+			ROTMAT(ang1, ang2, ang3, vec);
+			ROTATE(vec, vnx, vny, vnz, vnvec);
+			vnx = vnvec[0];
+			vny = vnvec[1];
+			vnz = vnvec[2];
+		}
+
+		int J[3];
+		J[0] = std::distance(AT.begin(), std::max_element(AT.begin(), AT.end()));
+		J[2] = std::distance(AT.begin(), std::min_element(AT.begin(), AT.end()));
+		J[1] = 3 - J[0] - J[2];
+		double VN[3];
+		VN[0] = vnvec[0];
+		VN[1] = vnvec[1];
+		VN[2] = vnvec[2];
+		double vntxx = VN[J[0]];
+		double vntyy = VN[J[1]];
+		double vntzz = VN[J[2]];
+		double a2 = AT[J[0]];
+		double b2 = AT[J[1]];
+		double c2 = AT[J[2]];
+
+		double a2b2 = a2*b2;
+		double a2c2 = a2*c2;
+		double b2c2 = b2*c2;
+
+		double cos2av = (a2c2 - b2c2) / (a2b2 - b2c2);
+		double sin2av = 1.0 - cos2av;
+		double cosav = sqrt(cos2av);
+		double sinav = sqrt(sin2av);
+		double term1 = cosav*vntxx;
+		double term2 = sinav*vntzz;
+		double oa1v = term1 + term2;
+		double oa2v = term1 - term2;
+
+		if (max(abs(oa1v), abs(oa2v)) > tolcir)
+		{
+			untxx = -vntzz;
+			untyy = 0.0;
+			untzz = vntxx;
+			wntxx = 0.0;
+			wntyy = 1.0;
+			wntzz = 0.0;
+			at1 = b2;
+			at2 = b2;
+		} else
+		{
+			double rvj1mg = 1.0 / sqrt(1.0 - oa1v*oa1v);
+			double rvj2mg = 1.0 / sqrt(1.0 - oa2v*oa2v);
+			double rsum = rvj1mg + rvj2mg;
+			double rdif = rvj1mg - rvj2mg;
+			double oauxx = cosav*rsum;
+			double oauzz = sinav * rdif;
+			double oawxx = cosav * rdif;
+			double oawzz = sinav * rsum;
+			double oauv = oauxx*vntxx + oauzz * vntzz;
+			double oawv = oawxx * vntxx + oawzz * vntzz;
+			double oauoau = oauxx*oauxx + oauzz*oauzz;
+			double oawoaw = oawxx * oawxx + oawzz * oawzz;
+			double umterm = oauoau - oauv*oauv;
+			double wmterm = oawoaw - oawv * oawv;
+
+			if (umterm > wmterm)
+			{
+				double rumagh = 1.0 / sqrt(umterm);
+				untxx = (oauxx - oauv * vntxx) * rumagh;
+				untyy = -oauv*vntyy*rumagh;
+				untzz = (oauzz - oauv*vntzz)*rumagh;
+				wntxx = untyy*vntzz - untzz*vntyy;
+				wntyy = untzz*vntxx - untxx*vntzz;
+				wntzz = untxx * vntyy - untyy*vntxx;
+			} else
+			{
+				double rwmagh = 1.0 / sqrt(wmterm);
+				wntxx = (oawxx - oawv*vntxx) * rwmagh;
+				wntyy = -oawv*vntyy*rwmagh;
+				wntzz = (oawzz - oawv*vntzz) * rwmagh;
+				untxx = wntyy*vntzz - wntzz * vntyy;
+				untyy = wntzz*vntxx - wntxx * vntzz;
+				untzz = wntxx*vntyy - wntyy*vntxx;
+
+			}
+			double a2b2c2 = a2b2*c2;
+			double den1 = b2c2 * untxx*untxx + a2c2 * untyy*untyy + a2b2*untzz*untzz;
+			double den2 = b2c2 * wntxx*wntxx + a2c2 * wntyy*wntyy + a2b2*wntzz*wntzz;
+			at1 = a2b2c2 / den1;
+			at2 = a2b2c2 / den2;
+		}
+
+		double UN[3],WN[3];
+		UN[J[0]] = untxx;
+		UN[J[1]] = untyy;
+		UN[J[2]] = untzz;
+		double unxx = UN[0];
+		double unyy = UN[1];
+		double unzz = UN[2];
+		WN[J[0]] = wntxx;
+		WN[J[1]] = wntyy;
+		WN[J[2]] = wntzz;
+		double wnxx = WN[0];
+		double wnyy = WN[1];
+		double wnzz = WN[2];
+		ROTATE(vec, unxx, unyy, unzz, unvec);
+		ROTATE(vec, wnxx, wnyy, wnzz, wnvec);
+		unx = unvec[0];
+		uny = unvec[1];
+		unz = unvec[2];
+		wnx = wnvec[0];
+		wny = wnvec[1];
+		wnz = wnvec[2];
+	}
+	double dt1 = at1*vmag;
+	double dt2 = at2*vmag;
+
+
+	std::vector<double> rotmat({ vnx, unx, wnx, vny, uny, wny, vnz, unz, wnz });
+	TENSYM(DL, dt1, dt2,rotmat, dxx, dxy, dxz, dyx, dyy, dyz, dzx, dzy, dzz);
+}
+
+void Storage::ROTATE(std::vector<double> vec, double v1, double v2, double v3, std::vector<double>& out_vec)
+{
+	out_vec[0] = vec[0] * v1 + vec[1] * v2 + vec[2] * v3;
+	out_vec[1] = vec[3] * v1 + vec[4] * v2 + vec[5] * v3;
+	out_vec[2] = vec[6] * v1 + vec[7] * v2 + vec[8] * v3;
+}
+
+void Storage::GLOCOL(int L, double vole[], double bflowe[8][8], double dflowe[], double btrane[8][8], double dtrane[8][8])
+{
+	int n1 = L*N48;
+	int n8 = n1 + N48;
+
+	if (ML == 2)
+		goto u_only;
+	int ie = 0;
+	int m = -1;
+	for (int i = n1; i < n8; i++)
+	{
+		
+		int ib = incidence_vector[i];
+		ib = ib - 1;
+
+		node_vol[ib] = node_vol[ib] + vole[ie];
+		node_p_rhs[ib] = node_p_rhs[ib] + dflowe[ie];
+		int je = 0;
+		for (int j = n1; j < n8; j++)
+		{
+			int jb = incidence_vector[j];
+			jb = jb - 1;
+			int mbeg = JA[jb];
+			int mend = JA[jb + 1];
+			bool found = false;
+			for (int mm = mbeg; mm < mend; mm++)
+			{
+				if (ib == IA[mm])
+				{
+					m = mm;
+					found = true;
+					break;
+				}
+			}
+			if (found)
+			{
+				if (m != -1)
+					PMAT[m] = PMAT[m] + bflowe[je][ie];
+				else
+					SimulationControl::exitOnError(" m negative");
+			}
+			
+			je++;
+		}
+		
+	
+
+		ie++;
+	}
+
+	if (ML == 1)
+		return;
+
+	u_only:
+	if (NOUMAT != 1)
+	{
+		ie = 0;
+		for (int i = n1; i < n8; i++)
+		{
+			int ib = incidence_vector[i];
+			ib = ib - 1;
+			int je = 0;
+			for (int j = n1; j < n8; j++)
+			{
+				int jb = incidence_vector[j];
+				jb = jb - 1;
+				int mbeg = JA[jb];
+				int mend = JA[jb + 1];
+				bool found = false;
+				for (int mm = mbeg; mm < mend; mm++)
+				{
+					if (ib == IA[mm])
+					{
+						m = mm;
+						found = true;
+						break;
+					}
+				}
+				if (found)
+				{
+					if (m != -1)
+						UMAT[m] = UMAT[m] + dtrane[je][ie] + btrane[je][ie];
+					else
+						SimulationControl::exitOnError(" m negative");
+				}
+				je++;
+			}
+			
+			ie++;
+		}
+	}
+}
+
+double Storage::DNRM2(int N, double * X, int INCX)
+{
+	double NORM, SSQ, SCALE;
+	double ABSXI;
+	NORM = 0.0;
+	if (N < 1 || INCX < 1)
+	{
+		NORM = 0.0;
+	}
+	else if (N == 1)
+	{
+		NORM = abs(X[0]);
+	}
+	else
+	{
+		SCALE = 0.0;
+		SSQ = 1.0;
+
+		for (int it = 1; it < (1 + (N - 1)*INCX); it += INCX)
+		{
+			if (X[it] != 0.0)
+			{
+				ABSXI = abs(X[it]);
+				if (SCALE < ABSXI)
+				{
+					SSQ = 1.0 + SSQ * pow(SCALE / ABSXI, 2);
+					SCALE = ABSXI;
+				}
+				else
+				{
+					SSQ = SSQ + pow(ABSXI / SCALE, 2);
+				}
+			}
+		}
+		NORM = SCALE * sqrt(SSQ);
+	}
+	return NORM;
+}
+
+void Storage::re_orient_matrix(int jmper_size, int vals_size, double vals[], std::vector<int>&jmper, std::vector<int>& indices, double * new_vals, int * new_jmper, int * new_indices)
+{
+	int * rr = new int[vals_size];
+	int * nn = new int[jmper_size];
+	for (int k = 0, i = 0; i < jmper_size-1; i++)
+		for (int j = 0; j < jmper[i + 1] - jmper[i]; j++)
+			rr[k++] = i;
+
+	for (int i = 0; i < vals_size; i++)
+		new_jmper[indices[i] + 1]++;
+
+	for (int i = 1; i <= jmper_size - 1; i++)
+		new_jmper[i] += new_jmper[i - 1];
+
+	memcpy(nn, new_jmper, sizeof(int)*jmper_size);
+
+	for (int i = 0; i < vals_size; i++) {
+		int x = nn[indices[i]]++;
+		new_vals[x] = vals[i];
+		new_indices[x] = rr[i];
+	}
+	delete[]rr;
+	delete[]nn;
 }

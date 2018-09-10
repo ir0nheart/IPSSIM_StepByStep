@@ -15,6 +15,7 @@ public:
 	void unmapFile(){ UnmapViewOfFile(mapViewOfFile); };
 	void findDataSetPositionsInMap();
 	void extractDataSets();
+	void extractBCS();
 	void RemoveCharFromString(char * p, char c);
 	int convertInt(std::vector<char> cInt);
 	double convertDouble(std::vector<char> cDouble);

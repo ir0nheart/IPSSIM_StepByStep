@@ -6,16 +6,38 @@
 #include "Node.h"
 #include "Element.h"
 #include "obsPoint.h"
+#include "Bcs.h"
 
 class Storage
 {
 public:
 	static Storage * instance();
+	void BUBSAT(double& SWB, double& RELKB, double PRES, double CNUB, double & RELKT, double& SWT, double SW, double RELK);
+	void DISPR3(double vx, double vy, double vz, double vmag, double ang1, double ang2, double ang3,
+		double ALMAX, double ALMID, double ALMIN, double ATMAX, double ATMID, double ATMIN,
+		double& dxx, double & dxy, double& dxz, double & dyx, double & dyy, double & dyz, double& dzx, double & dzy, double & dzz);
+	void GLOCOL(int L,double vole[],double bflowe[8][8],double dflowe[],double btrane[8][8],double dtrane[8][8]);
+	void BCTIME();
+	void BCSTEP();
+	void ADSORB();
+	void ELEMN3();
+	void NODAL();
+	void BC();
+	void ROTATE(std::vector<double> vec, double v1, double v2, double v3, std::vector<double>& out_vec);
+	void BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, double F[],double W[], double& DET,double CJ[],
+		double DFDXG[],double DFDYG[],double DFDZG[],double DWDXG[],double DWDYG[],double DWDZG[],double & swbg,double& relkbg,
+		double & vxg,double&vyg,double & vzg,double & vgmag,double& swtg,double&relktg,double &viscg,double & rhog,double &rgxg,double&rgyg,double&rgzg,double &porg);
+	void ELEMN2();
+	void set_bcs_defined(bool v){ bcs_defined = v; }
+	bool get_bcs_defined()const { return bcs_defined; }
+	void simulation();
 	void output_initial_starting_if_transient();
 	void determine_tmax();
 	void check_restart();
 	void addTittle(std::string str);
 	void check_data_sets();
+	void set_steady_state_switches();
+	void init_a_val(double * vec, int ssize, double val){ for (int i = 0; i < ssize; i++) vec[i] = val; }
 	std::string getTittle(int index);
 	void set_sutra_string(std::vector<char> str){ sutra_string = str; }
 	void set_version_string(std::vector<char> str){ version_string = str; }
@@ -213,6 +235,12 @@ public:
 	void de_allocate_node_arrays();
 	void ROTMAT(double& a1, double& a2, double& a3, std::vector<double>& vec);
 	void TENSYM(double& pmax, double& pmid, double& pmin, std::vector<double>& rotMat, double& permxx, double& permxy, double &permxz, double& permyx, double&permyy, double& permyz, double& permzx, double& permzy, double& permzz);
+	std::vector<Schedule *> get_schedule_list(){ return schedule_list; }
+	void add_bcs(Bcs * bcs){ bcsContainer.push_back(bcs); }
+	std::vector<Bcs *> get_bcs_container(){ return bcsContainer; }
+	double DNRM2(int N, double * X, int INCX);
+
+	void re_orient_matrix(int jmper_size, int vals_size, double vals[], std::vector<int>&jmper, std::vector<int>& indices, double * new_vals, int * new_jmper, int * new_indices);
 private:
 	static Storage * m_pInstance;
 	std::unordered_map<std::string, DataSet *> dataSetMap;
@@ -266,11 +294,13 @@ private:
 	std::vector<Schedule *> schedule_list;
 	bool ONCEP;
 	bool SETBCS;
+	bool INTIM;
 	char CINACT;
 
 	int IBCT;
 	int solution_storage;
-	int NN, NE, NSOP, NSOU, NPBC, NUBC,NOBS;
+	int NN;
+	int NE, NSOP, NSOU, NPBC, NUBC, NOBS;
 	int NSCH, NPCYC, NUCYC;
 	int NN1, NN2, NN3;
 	int ITRMAX, RPMAX, RUMAX;
@@ -285,8 +315,8 @@ private:
 	int NOBCYC;
 	
 	
-
-
+	int KSOLVP;
+	int ISTOP;
 	int ME; // -1 For Solute , + 1 for ENERGY
 	int IUNSAT;
 	int ISSFLO;
@@ -314,8 +344,6 @@ private:
 	int NSOUI;
 	int IQSOPT;
 	int IQSOUT;
-	int IBCUBC;
-	int IBCPBC;
 	int IPBCT;
 	int IUBCT;
 	int ITMAX;
@@ -328,7 +356,21 @@ private:
 	int ITRST;
 	int IT;
 	int ITBCS;
+	int ITREL;
+	int ML;
+	int NOUMAT;
+	int ITER;
 
+	double TSECM1;
+	double RELCHG;
+	double DELTM1;
+	double DLTPM1;
+	double DLTUM1;
+	double BDELP1;
+	double BDELU1;
+	double BDELP;
+	double BDELU;
+	double TELAPS;
 	double TSECP0;
 	double TSECU0;
 	double TMIN;
@@ -361,8 +403,8 @@ private:
 	double ATMDF;
 	double ATMNF;
 	
-	double GNUP1;
-	double GNUU1;
+	//double GNUP1;
+	//double GNUU1;
 	double SCALX;
 	double SCALY;
 	double SCALZ;
@@ -434,6 +476,9 @@ private:
 	double * el_permzx;
 	double * el_permzy;
 	double * el_permzz;
+	double * el_vmag;
+	double * el_vang1;
+	double * el_vang2;
 
 	std::vector<std::vector<double>> el_gxsi;
 	std::vector<std::vector<double>> el_geta;
@@ -471,7 +516,42 @@ private:
 	double * node_sl;
 	double * node_sr;
 	double * node_dpdtitr;
+	double * node_piter;
+	double * node_pvel;
+	double * node_uiter;
+	double * node_rcitm1;
+	double * node_qinitr;
+	double * node_cnubm1;
+	double * node_vol;
+	double * node_p_rhs;
+	double * node_u_rhs;
+	double * node_p_solution;
+	double * node_u_solution;
+	double * node_rho;
+	double * node_relk;
+	double * node_relkb;
+	double * node_relkt;
+	double * PMAT;
+	double * UMAT;
+
+	int * row_jumper;
+	int * col_indices;
+	double * new_MAT;
+
+	int * IBCPBC;
+	int * IBCUBC;
+	int * IBCSOP;
+	int * IBCSOU;
 	std::vector<std::vector<int>> node_neighbors;
+	std::vector<double> QPLITR;
+	std::vector<double> GNUP1;
+	std::vector<double> GNUU1;
+	std::vector<Bcs *> bcsContainer;
+	std::vector<double> GXLOC;
+	std::vector<double> GYLOC;
+	std::vector<double> GZLOC;
+	bool switch_set;
+	bool bcs_defined;
 	Storage();
 	~Storage();
 };

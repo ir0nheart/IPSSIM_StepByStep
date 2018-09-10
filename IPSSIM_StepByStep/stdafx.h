@@ -20,6 +20,9 @@
 #include <string>
 #include <streambuf>
 #include <istream>
-
+#include <viennacl/vector.hpp>
+#include <viennacl/compressed_matrix.hpp>
+#include <viennacl/linalg/gmres.hpp>
+#include <viennacl/linalg/ilu.hpp>
 
 // TODO: reference additional headers your program requires here

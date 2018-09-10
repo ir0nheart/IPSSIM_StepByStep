@@ -5,6 +5,7 @@
 #include "DataSet.h"
 #include "Storage.h"
 #include <cctype>
+#include "Bcs.h"
 
 class Storage;
 
@@ -1531,6 +1532,214 @@ void Parser::extractICS()
 
 
 
+}
+
+void Parser::extractBCS()
+{
+	char * map = mapViewOfFile;
+	char * start_str = map;
+	char * end_str;
+	int size = strlen(map);
+	std::vector<char>lineBuffer;
+	std::vector<std::vector<char>>lines;
+	const char* del = " ";
+	const char* diez = "#";
+	// Lets put all lines into vector;
+	for (int i = 0; i < size; i++){
+		if (map[i] == '\r'){
+			end_str = map + i;
+			lineBuffer.assign(start_str, end_str);
+			lineBuffer.push_back('\0');
+			lines.push_back(lineBuffer);
+			start_str = map + i + 2;
+
+		}
+	}
+	// First Line definition Schedule Name, thus omit this line
+	// Second Line actual schedule Name Parameters
+
+
+	std::vector<char> tmp;
+	for (std::vector<std::vector<char> >::iterator i = lines.begin(); i != lines.end(); ++i)
+	{
+		for (std::vector<char>::iterator j = i->begin(); j != i->end(); ++j)
+		{
+			if (*j != '\'')
+				tmp.push_back(*j);
+
+		}
+		*i = tmp;
+		tmp.clear();
+	}
+
+	std::string BCSSCH = lines[1].data();
+
+
+	Schedule * BCSSchedule = nullptr;
+	for (Schedule * sch : storage->get_schedule_list()){
+		if (sch->get_name() == BCSSCH){
+			BCSSchedule = sch;
+			break;
+		}
+	}
+
+	if (BCSSchedule == nullptr){
+		SimulationControl::exitOnError("BCS-1-1");
+	}
+
+
+	// Check File and Create BCS objects
+	std::vector<int> timeStepPositions;
+	for (int i = 0; i < lines.size(); i++){
+		int ind = 7;
+		if (lines[i].size() < 8)
+			ind = lines[i].size();
+		const std::string ch_str{ lines[i].begin(), lines[i].begin() + ind };
+		if (ch_str == "# BCSID"){
+			timeStepPositions.push_back(i + 1);
+		}
+	}
+
+	// parse defined TS informations and create BCS and store in container
+	for (int j : timeStepPositions){
+	//	boost::split(data, lines[j], boost::is_any_of(" "), boost::token_compress_on);
+		std::vector<std::vector<char>>parsed_strings(6);
+		int it = 0;
+		for (char c : lines[j])
+		{
+			if (it >0)
+			{
+				if (parsed_strings[it - 1].empty())
+					it = it - 1;
+			}
+			if (c != ' ')
+				parsed_strings[it].push_back(c);
+			if (c == ' ')
+				it++;
+		}
+
+		Bcs * bcs = new Bcs();
+		bcs->setScheduleName(BCSSCH);
+		std::string data;
+		data.assign(parsed_strings[0].begin(),parsed_strings[0].end());
+		bcs->setBCSID(data);
+		
+		size_t n = data.find_first_of("0123456789");
+		std::string ssTs;
+		if (n != std::string::npos){
+			size_t m = data.find_first_not_of("0123456789", n);
+			ssTs = data.substr(n, m != std::string::npos ? m - n : m);
+		}
+		bcs->setTimeStep(stoi(ssTs));
+		data.assign(parsed_strings[1].begin(), parsed_strings[1].end());
+		bcs->setNumberOfQINC(std::stoi(data));
+		data.assign(parsed_strings[2].begin(), parsed_strings[2].end());
+		bcs->setNumberOfUINC(std::stoi(data));
+		data.assign(parsed_strings[3].begin(), parsed_strings[3].end());
+		bcs->setNumberOfPBC(std::stoi(data));
+		data.assign(parsed_strings[4].begin(), parsed_strings[4].end());
+		bcs->setNumberOfUBC(std::stoi(data));
+
+		storage->add_bcs(bcs);
+	//	bcsContainer.push_back(bcs);
+	}
+
+	// Read Node and Condition
+	int i = 0;
+	for (int k : timeStepPositions){
+		int iNode;
+		int j = 0;
+		//vector<string> bcsData;
+		do{
+		///	boost::split(bcsData, lines[k + 3 + j], boost::is_any_of(" \t\r\n"), boost::token_compress_off);
+
+			std::vector<std::vector<char>>parsed_strings(3);
+			int it = 0;
+			for (char c : lines[j+k+3])
+			{
+				if (it >0)
+				{
+					if (parsed_strings[it - 1].empty())
+						it = it - 1;
+				}
+				if (c != ' ' && c!='\t')
+					parsed_strings[it].push_back(c);
+				if (c == ' ' || c=='\t')
+					it++;
+			}
+
+			iNode = std::stoi(parsed_strings[0].data());
+			if (iNode == 0)
+				break;
+			if (iNode > storage->get_nn()){
+				SimulationControl::exitOnError("BCS-3-1");
+			}
+
+			if (iNode > 0){
+				storage->get_bcs_container()[i]->addNode(iNode);
+				if (storage->get_bcs_container()[i]->getNumberOfQINC() > 0){
+					double QINC = std::stod(parsed_strings[1].data());
+					if (QINC > 0){
+						storage->get_bcs_container()[i]->addQINC(QINC);
+						storage->get_bcs_container()[i]->addIsQINC(true);
+						double UINC = std::stod(parsed_strings[2].data());
+						storage->get_bcs_container()[i]->addIsUINC(true);
+						storage->get_bcs_container()[i]->addUINC(UINC);
+					}
+					else{
+						storage->get_bcs_container()[i]->addQINC(QINC);
+						storage->get_bcs_container()[i]->addIsQINC(true);
+						storage->get_bcs_container()[i]->addIsUINC(false);
+						storage->get_bcs_container()[i]->addUINC(0.0);
+					}
+				}
+
+				if (storage->get_bcs_container()[i]->getNumberOfQUINC() > 0){
+					double QUINC = std::stod(parsed_strings[1].data());
+
+					storage->get_bcs_container()[i]->addQINC(QUINC);
+					storage->get_bcs_container()[i]->addIsQUINC(true);
+				}
+
+
+				if (storage->get_bcs_container()[i]->getNumberOfPBC() > 0){
+					double PBC = std::stod(parsed_strings[1].data());
+					double UBC = std::stod(parsed_strings[2].data());
+
+					storage->get_bcs_container()[i]->addPBC(PBC);
+					storage->get_bcs_container()[i]->addIsPBC(true);
+					storage->get_bcs_container()[i]->addUBC(UBC);
+					storage->get_bcs_container()[i]->addIsUBC(true);
+				}
+
+				if (storage->get_bcs_container()[i]->getNumberOfUBC() > 0){
+					double UBC = std::stod(parsed_strings[1].data());
+					storage->get_bcs_container()[i]->addUBC(UBC);
+					storage->get_bcs_container()[i]->addIsUBC(true);
+				}
+
+
+			}
+			else{
+				storage->get_bcs_container()[i]->addNode(abs(iNode));
+				storage->get_bcs_container()[i]->addIsPBC(false);
+				storage->get_bcs_container()[i]->addIsQINC(false);
+				storage->get_bcs_container()[i]->addIsQUINC(false);
+				storage->get_bcs_container()[i]->addIsUBC(false);
+				storage->get_bcs_container()[i]->addIsUINC(false);
+				storage->get_bcs_container()[i]->addPBC(0.0);
+				storage->get_bcs_container()[i]->addUBC(0.0);
+				storage->get_bcs_container()[i]->addQUINC(0.0);
+				storage->get_bcs_container()[i]->addQINC(0.0);
+				storage->get_bcs_container()[i]->addUINC(0.0);
+			}
+			j = j + 1;
+		} while (iNode != 0);
+
+
+		std::cout << "BCS extracted for Time Step : " << storage->get_bcs_container()[i]->getTimeStep() << std::endl;
+		i = i + 1;
+	}
 }
 Parser::~Parser()
 {
