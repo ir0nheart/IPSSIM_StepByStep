@@ -2363,10 +2363,10 @@ BEGIN_ITERATION:
 			A.set(row_jumper, col_indices, new_MAT, NN, NN,NELT);
 			
 			// Preconditioner
-			viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0(A, viennacl::linalg::ilu0_tag());
+			viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0_precond(A, viennacl::linalg::ilu0_tag());
 			viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 2000);
 			viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
-			viennacl::vector<double> vcl_results = my_gmres_solver(A, vcl_rhs, ilu0);
+			viennacl::vector<double> vcl_results = my_gmres_solver(A, vcl_rhs, ilu0_precond);
 			for (int i = 0; i < NN; i++)
 				node_p_rhs[i] = vcl_results[i];
 			int ITRS = my_gmres_solver.tag().iters();
@@ -2725,31 +2725,17 @@ void Storage::ELEMN3()
 		INTIM = false;
 		for (int i = 0; i < NE; i++)
 		{
-			double * DET = new double[8];
-			double * F = new double[8];
-			double * W = new double[8];
-			double rgxg[8], rgyg[8], rgzg[8];
-			
-			double DFDXG[8][8], DFDYG[8][8], DFDZG[8][8], DWDXG[8][8], DWDYG[8][8], DWDZG[8][8];
+			double  DET[8];
 			for (int j = 0; j < N48; j++)
 			{
 				double xloc = GXLOC[j];
 				double yloc = GYLOC[j];
 				double zloc = GZLOC[j];
-				double swbg[8];
-				double relkbg[8];
-				double porg[8];
-				double swtg[8];
-				double relktg[8];
-				double viscg[8], rhog[8];
-				//std::vector<double> CJ;
-				double * CJ = new double[9]{0};
-				double vxg[8], vyg[8], vzg[8], vgmag[8];
-				BASIS3(0, i, xloc, yloc, zloc, F,W, DET[j], CJ,DFDXG[i],DFDYG[i],DFDZG[i],DWDXG[i],DWDYG[i],DWDZG[i],swbg[i],relkbg[i],vxg[i],vyg[i],vzg[i],vgmag[i],swtg[i],relktg[i],viscg[i],rhog[i],rgxg[i],rgyg[i],rgzg[i],porg[i]);
+				double CJ[9]={0,0,0,0,0,0,0,0,0};
+				BASIS3_Simple(i, xloc, yloc, zloc, DET[j], CJ);
 				el_gxsi[i][j] = CJ[0] * GRAVX + CJ[1] * GRAVY + CJ[2] * GRAVZ;
 				el_geta[i][j] = CJ[3] * GRAVX + CJ[4] * GRAVY + CJ[5] * GRAVZ;
 				el_gzet[i][j] = CJ[6] * GRAVX + CJ[7] * GRAVY + CJ[8] * GRAVZ;
-				delete[] CJ;
 				if (DET[j] <= 0)
 				{
 					ISTOP = ISTOP + 1;
@@ -2757,9 +2743,6 @@ void Storage::ELEMN3()
 						<< i + 1 << " is negative or zero " << DET[j] << std::endl;
 				}
 			}
-			delete[] DET;
-			delete[] F;
-			delete[] W;
 		}
 	}
 
@@ -2771,68 +2754,74 @@ void Storage::ELEMN3()
 	if (IUNSAT != 0)
 		IUNSAT = 2;
 	// Main Element Loop
+	double XIX, YIY, ZIZ;
+	int kgx;
+	double F[8][8];
+	double W[8][8];
+	double CJ[9];
+	double DET[8];
+	double DWDXG[8][8];
+	double DWDYG[8][8];
+	double DWDZG[8][8];
+	double DFDXG[8][8];
+	double DFDYG[8][8];
+	double DFDZG[8][8];
+	double swbg[8];
+	double relkbg[8];
+	double swtg[8];
+	double viscg[8];
+	double rhog[8];
+	double relktg[8];
+	double rgxg[8], rgyg[8], rgzg[8];
+	double vole[8], dflowe[8], bflowe[8][8];
+	double vxg[8], vyg[8], vzg[8], vgmag[8];
+	double porg[8];
+	double RXXG[8], RXYG[8], RXZG[8], RYXG[8], RYYG[8], RYZG[8], RZXG[8], RZYG[8], RZZG[8];
+	double EXG[8], EYG[8], EZG[8];
+	double bxxg[8], bxyg[8], bxzg[8];
+	double byxg[8], byyg[8], byzg[8];
+	double bzxg[8], bzyg[8], bzzg[8];
+	double BTRANE[8][8];
+	double DTRANE[8][8];
+	double rddfjx, rddfjy, rddfjz;
+	double xloc, yloc, zloc;
+	double axsum, aysum, azsum;
+	double SWTEST;
+	double dxxg, dxyg, dxzg, dyxg, dyyg, dyzg, dzxg, dzyg, dzzg;
+	double eswg, rhocwg, esrcg;
+	double bddfjx, bddfjy, bddfjz, eddfj;
+	double rxxgd, rxygd, rxzgd, ryxgd, ryygd, ryzgd, rzxgd, rzygd, rzzgd;
+	double rdrx, rdry, rdrz;
+
+	double BXXGD,BXYGD,BXZGD,BYXGD,BYYGD, BYZGD,BZXGD,BZYGD,BZZGD;
+	double EXGD, EYGD, EZGD;
 	for (int l = 0; l < NE; l++)
 	{
-		double XIX, YIY, ZIZ;
+		
 		XIX = YIY = ZIZ = -1.0;
-		int kg = 0;
+		kgx = 0;
 
-		double F[8][8];
-		double W[8][8];
-
-		double CJ[9];
-		double DET[8];
-		double DWDXG[8][8];
-		double DWDYG[8][8];
-		double DWDZG[8][8];
-		double DFDXG[8][8];
-		double DFDYG[8][8];
-		double DFDZG[8][8];
-		double swbg[8];
-		double relkbg[8];
-		double swtg[8];
-		double viscg[8];
-		double rhog[8];
-		double relktg[8];
-		double rgxg[8], rgyg[8], rgzg[8];
-		double vole[8], dflowe[8], bflowe[8][8];
-		double vxg[8], vyg[8], vzg[8], vgmag[8];
-		double porg[8];
+		
 		for (int izl = 0; izl < 2; izl++){
 			for (int iyl = 0; iyl < 2; iyl++){
 				for (int ixl = 0; ixl < 2; ixl++)
 				{
-					double xloc = XIX * GLOC;
-					double yloc = YIY * GLOC;
-					double zloc = ZIZ * GLOC;
-					BASIS3(1, l, xloc, yloc, zloc, F[kg], W[kg], DET[kg], CJ, DFDXG[kg], DFDYG[kg], DFDZG[kg], DWDXG[kg], DWDYG[kg], DWDZG[kg], swbg[kg], relkbg[kg], vxg[kg], vyg[kg], vzg[kg], vgmag[kg], swtg[kg], relktg[kg], viscg[kg], rhog[kg], rgxg[kg], rgyg[kg], rgzg[kg], porg[kg]);
-					kg++;
+					xloc = XIX * GLOC;
+					yloc = YIY * GLOC;
+					zloc = ZIZ * GLOC;
+					BASIS3(1, l, xloc, yloc, zloc, F[kgx], W[kgx], DET[kgx], CJ, DFDXG[kgx], DFDYG[kgx], DFDZG[kgx], DWDXG[kgx], DWDYG[kgx], DWDZG[kgx], swbg[kgx], relkbg[kgx], vxg[kgx], vyg[kgx], vzg[kgx], vgmag[kgx], swtg[kgx], relktg[kgx], viscg[kgx], rhog[kgx], rgxg[kgx], rgyg[kgx], rgzg[kgx], porg[kgx]);
 					XIX = -XIX;
+					kgx++;
 				}
 				YIY = -YIY;
 			}
 			ZIZ = -ZIZ;
 		}
-		double tDFDXG[8][8], tDFDYG[8][8], tDFDZG[8][8], tDWDXG[8][8], tDWDYG[8][8], tDWDZG[8][8];
-		for (int i = 0; i < 8; i++)
-		{
-			for (int j = 0; j < 8; j++)
-			{
-				tDFDXG[i][j] = DFDXG[j][i];
-				tDFDYG[i][j] = DFDYG[j][i];
-				tDFDZG[i][j] = DFDZG[j][i];
-				tDWDXG[i][j] = DWDXG[j][i];
-				tDWDYG[i][j] = DWDYG[j][i];
-				tDWDZG[i][j] = DWDZG[j][i];
-
-			}
-			
-		}
 		
 		//calculate velocity at element centroid
 		if (kvcalc - 2 == 0)
 		{
-			double axsum, aysum, azsum;
+			
 			axsum = aysum = azsum = 0.0;
 			for (int i = 0; i < 8; i++)
 			{
@@ -2843,9 +2832,9 @@ void Storage::ELEMN3()
 			el_vmag[l] = sqrt(axsum*axsum + aysum + aysum + azsum + azsum);
 			if (el_vmag[l] != 0.0)
 			{
-				el_vang2[l] = asin(azsum / el_vmag[l]) *5.5729577951308232e-1;
+				el_vang2[l] = asin(azsum / el_vmag[l]) *57.2957795130823;
 				el_vmag[l] = el_vmag[l] * 0.125;
-				el_vang1[l] = atan2(aysum, axsum)*5.5729577951308232e-1;
+				el_vang1[l] = atan2(aysum, axsum)*57.2957795130823;
 			}
 			else
 			{
@@ -2861,8 +2850,8 @@ void Storage::ELEMN3()
 		if (ML == 2)
 			goto u_only;
 
-		double SWTEST = 0.0;
-		double RXXG[8], RXYG[8], RXZG[8], RYXG[8], RYYG[8], RYZG[8], RZXG[8], RZYG[8], RZZG[8];
+		SWTEST = 0.0;
+		
 		for (int i = 0; i < 8; i++)
 		{
 			SWTEST = SWTEST + swtg[i];
@@ -2897,37 +2886,32 @@ void Storage::ELEMN3()
 
 		for (int kg = 0; kg < 8; kg++)
 		{
-			double rxxgd = RXXG[kg] * DET[kg];
-			double rxygd = RXYG[kg] * DET[kg];
-			double rxzgd = RXZG[kg] * DET[kg];
-			double ryxgd = RYXG[kg] * DET[kg];
-			double ryygd = RYYG[kg] * DET[kg];
-			double ryzgd = RYZG[kg] * DET[kg];
-			double rzxgd = RZXG[kg] * DET[kg];
-			double rzygd = RZYG[kg] * DET[kg];
-			double rzzgd = RZZG[kg] * DET[kg];
-			double rdrx = rxxgd*rgxg[kg] + rxygd*rgyg[kg] + rxzgd*rgzg[kg];
-			double rdry = ryxgd*rgxg[kg] + ryygd*rgyg[kg] + ryzgd*rgzg[kg];
-			double rdrz = rzxgd*rgxg[kg] + rzygd*rgyg[kg] + rzzgd*rgzg[kg];
+			 rxxgd = RXXG[kg] * DET[kg];
+			 rxygd = RXYG[kg] * DET[kg];
+			 rxzgd = RXZG[kg] * DET[kg];
+			 ryxgd = RYXG[kg] * DET[kg];
+			 ryygd = RYYG[kg] * DET[kg];
+			 ryzgd = RYZG[kg] * DET[kg];
+			 rzxgd = RZXG[kg] * DET[kg];
+			 rzygd = RZYG[kg] * DET[kg];
+			 rzzgd = RZZG[kg] * DET[kg];
+			 rdrx = rxxgd*rgxg[kg] + rxygd*rgyg[kg] + rxzgd*rgzg[kg];
+			 rdry = ryxgd*rgxg[kg] + ryygd*rgyg[kg] + ryzgd*rgzg[kg];
+			 rdrz = rzxgd*rgxg[kg] + rzygd*rgyg[kg] + rzzgd*rgzg[kg];
 			for (int i = 0; i < 8; i++)
 			{
-			//	vole[i] = vole[i] + F[i][kg] * DET[kg];
-			//	dflowe[i] = dflowe[i] + rdrx*DWDXG[i][kg] + rdry*DWDYG[i][kg] + rdrz*DWDZG[i][kg];
 				vole[i] = vole[i] + F[kg][i] * DET[kg];
-				dflowe[i] = dflowe[i] + rdrx*tDWDXG[i][kg] + rdry*tDWDYG[i][kg] + rdrz*tDWDZG[i][kg];
+				dflowe[i] = dflowe[i] + rdrx*DWDXG[kg][i] + rdry*DWDYG[kg][i] + rdrz*DWDZG[kg][i];
 			}
 
 			for (int j = 0; j < 8; j++)
 			{
-				/*double rddfjx = rxxgd*DFDXG[j][kg] + rxygd*DFDYG[j][kg] + rxzgd*DFDZG[j][kg];
-				double rddfjy = ryxgd*DFDXG[j][kg] + ryygd*DFDYG[j][kg] + ryzgd*DFDZG[j][kg];
-				double rddfjz = rzxgd*DFDXG[j][kg] + rzygd*DFDYG[j][kg] + rzzgd*DFDZG[j][kg];*/
-				double rddfjx = rxxgd*tDFDXG[j][kg] + rxygd*tDFDYG[j][kg] + rxzgd*tDFDZG[j][kg];
-				double rddfjy = ryxgd*tDFDXG[j][kg] + ryygd*tDFDYG[j][kg] + ryzgd*tDFDZG[j][kg];
-				double rddfjz = rzxgd*tDFDXG[j][kg] + rzygd*tDFDYG[j][kg] + rzzgd*tDFDZG[j][kg];
+			
+				rddfjx = rxxgd*DFDXG[kg][j] + rxygd*DFDYG[kg][j] + rxzgd*DFDZG[kg][j];
+				rddfjy = ryxgd*DFDXG[kg][j] + ryygd*DFDYG[kg][j] + ryzgd*DFDZG[kg][j];
+			    rddfjz = rzxgd*DFDXG[kg][j] + rzygd*DFDYG[kg][j] + rzzgd*DFDZG[kg][j];
 				for (int p = 0; p < 8; p++){
-					//	bflowe[p][j] = bflowe[p][j] + DWDXG[p][kg] * rddfjx + DWDYG[p][kg] * rddfjy + DWDZG[p][kg] * rddfjz;
-				bflowe[p][j] = bflowe[p][j] + DWDXG[p][kg] * rddfjx + DWDYG[p][kg] * rddfjy + DWDZG[p][kg] * rddfjz;
+					bflowe[j][p] = bflowe[j][p] + DWDXG[kg][p] * rddfjx + DWDYG[kg][p] * rddfjy + DWDZG[kg][p] * rddfjz;
 				}
 			}
 		}
@@ -2946,38 +2930,35 @@ void Storage::ELEMN3()
 		}
 		for (int kg = 0; kg < 8; kg++)
 		{
-			double rxxgd = RXXG[kg] * DET[kg];
-			double rxygd = RXYG[kg] * DET[kg];
-			double rxzgd = RXZG[kg] * DET[kg];
-			double ryxgd = RYXG[kg] * DET[kg];
-			double ryygd = RYYG[kg] * DET[kg];
-			double ryzgd = RYZG[kg] * DET[kg];
-			double rzxgd = RZXG[kg] * DET[kg];
-			double rzygd = RZYG[kg] * DET[kg];
-			double rzzgd = RZZG[kg] * DET[kg];
-			double rdrx = rxxgd*rgxg[kg] + rxygd*rgyg[kg] + rxzgd*rgzg[kg];
-			double rdry = ryxgd*rgxg[kg] + ryygd*rgyg[kg] + ryzgd*rgzg[kg];
-			double rdrz = rzxgd*rgxg[kg] + rzygd*rgyg[kg] + rzzgd*rgzg[kg];
+			 rxxgd = RXXG[kg] * DET[kg];
+			 rxygd = RXYG[kg] * DET[kg];
+			 rxzgd = RXZG[kg] * DET[kg];
+			 ryxgd = RYXG[kg] * DET[kg];
+			 ryygd = RYYG[kg] * DET[kg];
+			 ryzgd = RYZG[kg] * DET[kg];
+			 rzxgd = RZXG[kg] * DET[kg];
+			 rzygd = RZYG[kg] * DET[kg];
+			 rzzgd = RZZG[kg] * DET[kg];
+			 rdrx = rxxgd*rgxg[kg] + rxygd*rgyg[kg] + rxzgd*rgzg[kg];
+			 rdry = ryxgd*rgxg[kg] + ryygd*rgyg[kg] + ryzgd*rgzg[kg];
+			 rdrz = rzxgd*rgxg[kg] + rzygd*rgyg[kg] + rzzgd*rgzg[kg];
 			for (int i = 0; i < 8; i++)
 			{
-				/*vole[i] = vole[i] + F[i][kg] * DET[kg];
-				dflowe[i] = dflowe[i] + rdrx*DFDXG[i][kg] + rdry*DFDYG[i][kg] + rdrz*DFDZG[i][kg];*/
+			
 				vole[i] = vole[i] + F[kg][i] * DET[kg];
-				dflowe[i] = dflowe[i] + rdrx*tDFDXG[i][kg] + rdry*tDFDYG[i][kg] + rdrz*tDFDZG[i][kg];
+				dflowe[i] = dflowe[i] + rdrx*DFDXG[kg][i] + rdry*DFDYG[kg][i] + rdrz*DFDZG[kg][i];
 			}
 
 			for (int j = 0; j < 8; j++)
 			{
-				/*double rddfjx = rxxgd*DFDXG[j][kg] + rxygd*DFDYG[j][kg] + rxzgd*DFDZG[j][kg];
-				double rddfjy = ryxgd*DFDXG[j][kg] + ryygd*DFDYG[j][kg] + ryzgd*DFDZG[j][kg];
-				double rddfjz = rzxgd*DFDXG[j][kg] + rzygd*DFDYG[j][kg] + rzzgd*DFDZG[j][kg];*/
-				double rddfjx = rxxgd*tDFDXG[j][kg] + rxygd*tDFDYG[j][kg] + rxzgd*tDFDZG[j][kg];
-				double rddfjy = ryxgd*tDFDXG[j][kg] + ryygd*tDFDYG[j][kg] + ryzgd*tDFDZG[j][kg];
-				double rddfjz = rzxgd*tDFDXG[j][kg] + rzygd*tDFDYG[j][kg] + rzzgd*tDFDZG[j][kg];
+			
+				rddfjx = rxxgd*DFDXG[kg][j] + rxygd*DFDYG[kg][j] + rxzgd*DFDZG[kg][j];
+				rddfjy = ryxgd*DFDXG[kg][j] + ryygd*DFDYG[kg][j] + ryzgd*DFDZG[kg][j];
+				rddfjz = rzxgd*DFDXG[kg][j] + rzygd*DFDYG[kg][j] + rzzgd*DFDZG[kg][j];
 				for (int p = 0; p < 8; p++)
 				{
-					//bflowe[p][j] = bflowe[p][j] + DFDXG[p][kg] * rddfjx + DFDYG[p][kg] * rddfjy + DFDZG[p][kg] * rddfjz;
-					bflowe[p][j] = bflowe[p][j] + tDFDXG[p][kg] * rddfjx + tDFDYG[p][kg] * rddfjy + tDFDZG[p][kg] * rddfjz;
+			
+					bflowe[j][p] = bflowe[j][p] + DFDXG[kg][p] * rddfjx + DFDYG[kg][p] * rddfjy + DFDZG[kg][p] * rddfjz;
 				}
 					
 			}
@@ -2991,12 +2972,9 @@ void Storage::ELEMN3()
 			goto send;
 
 		// calculate parameters for energy balanca or solute mass balance at gauss points
-		double EXG[8], EYG[8], EZG[8];
-		double dxxg, dxyg, dxzg, dyxg, dyyg, dyzg, dzxg, dzyg, dzzg;
-		double eswg, rhocwg, esrcg;
-		double bxxg[8], bxyg[8], bxzg[8];
-		double byxg[8], byyg[8], byzg[8];
-		double bzxg[8], bzyg[8], bzzg[8];
+		
+		
+	
 		//add difusion and dispersion terms to total dispersion tensor
 		for (int kg = 0; kg < 8; kg++)
 		{
@@ -3036,8 +3014,7 @@ void Storage::ELEMN3()
 			bzzg[kg] = esrcg*dzzg + ESE;
 
 		}
-		double BTRANE[8][8];
-		double DTRANE[8][8];
+	
 		for (int i = 0; i < 8; i++){
 			for (int j = 0; j < 8; j++)
 			{
@@ -3048,34 +3025,29 @@ void Storage::ELEMN3()
 
 		for (int kg = 0; kg < 8; kg++)
 		{
-			double BXXGD = bxxg[kg] * DET[kg];
-			double BXYGD = bxyg[kg] * DET[kg];
-			double BXZGD = bxzg[kg] * DET[kg];
-			double BYXGD = byxg[kg] * DET[kg];
-			double BYYGD = byyg[kg] * DET[kg];
-			double BYZGD = byzg[kg] * DET[kg];
-			double BZXGD = bzxg[kg] * DET[kg];
-			double BZYGD = bzyg[kg] * DET[kg];
-			double BZZGD = bzzg[kg] * DET[kg];
-			double EXGD = EXG[kg] * DET[kg];
-			double EYGD = EYG[kg] * DET[kg];
-			double EZGD = EZG[kg] * DET[kg];
+			 BXXGD = bxxg[kg] * DET[kg];
+			 BXYGD = bxyg[kg] * DET[kg];
+			 BXZGD = bxzg[kg] * DET[kg];
+			 BYXGD = byxg[kg] * DET[kg];
+			 BYYGD = byyg[kg] * DET[kg];
+			 BYZGD = byzg[kg] * DET[kg];
+			 BZXGD = bzxg[kg] * DET[kg];
+			 BZYGD = bzyg[kg] * DET[kg];
+			 BZZGD = bzzg[kg] * DET[kg];
+			 EXGD = EXG[kg] * DET[kg];
+			 EYGD = EYG[kg] * DET[kg];
+			 EZGD = EZG[kg] * DET[kg];
 			for (int j = 0; j < 8; j++)
 			{
-				/*double bddfjx = BXXGD*DFDXG[j][kg] + BXYGD*DFDYG[j][kg] + BXZGD*DFDZG[j][kg];
-				double bddfjy = BYXGD*DFDXG[j][kg] + BYYGD*DFDYG[j][kg] + BYZGD*DFDZG[j][kg];
-				double bddfjz = BZXGD*DFDXG[j][kg] + BZYGD*DFDYG[j][kg] + BZZGD*DFDZG[j][kg];
-				double eddfj = EXGD*DFDXG[j][kg] + EYGD*DFDYG[j][kg] + EZGD*DFDZG[j][kg];*/
-				double bddfjx = BXXGD*tDFDXG[j][kg] + BXYGD*tDFDYG[j][kg] + BXZGD*tDFDZG[j][kg];
-				double bddfjy = BYXGD*tDFDXG[j][kg] + BYYGD*tDFDYG[j][kg] + BYZGD*tDFDZG[j][kg];
-				double bddfjz = BZXGD*tDFDXG[j][kg] + BZYGD*tDFDYG[j][kg] + BZZGD*tDFDZG[j][kg];
-				double eddfj = EXGD*tDFDXG[j][kg] + EYGD*tDFDYG[j][kg] + EZGD*tDFDZG[j][kg];
+				
+				bddfjx = BXXGD*DFDXG[kg][j] + BXYGD*DFDYG[kg][j] + BXZGD*DFDZG[kg][j];
+				bddfjy = BYXGD*DFDXG[kg][j] + BYYGD*DFDYG[kg][j] + BYZGD*DFDZG[kg][j];
+				bddfjz = BZXGD*DFDXG[kg][j] + BZYGD*DFDYG[kg][j] + BZZGD*DFDZG[kg][j];
+				eddfj = EXGD*DFDXG[kg][j] + EYGD*DFDYG[kg][j] + EZGD*DFDZG[kg][j];
 				for (int i = 0; i < 8; i++)
 				{
-					/*BTRANE[i][j] = BTRANE[i][j] + DFDXG[i][kg] * bddfjx + DFDYG[i][kg] * bddfjy + DFDZG[i][kg] * bddfjz;
-					DTRANE[i][j] = DTRANE[i][j] + eddfj*W[i][kg];*/
-					BTRANE[i][j] = BTRANE[i][j] + tDFDXG[i][kg] * bddfjx + tDFDYG[i][kg] * bddfjy + tDFDZG[i][kg] * bddfjz;
-					DTRANE[i][j] = DTRANE[i][j] + eddfj*W[kg][i];
+					BTRANE[j][i] = BTRANE[j][i] + DFDXG[kg][i] * bddfjx + DFDYG[kg][i] * bddfjy + DFDZG[kg][i] * bddfjz;
+					DTRANE[j][i] = DTRANE[j][i] + eddfj*W[kg][i];
 				}
 			}
 		}
@@ -3225,6 +3197,54 @@ void Storage::BC()
 		}
 }
 
+void Storage::BASIS3_Simple( int L, double XLOC, double YLOC, double ZLOC, double& DET, double CJ[])
+{
+	double XIIX[8] = { -1.0, +1.0, +1.0, -1.0, -1.0, +1.0, +1.0, -1.0 };
+	double YIIY[8] = { -1.0, -1.0, +1.0, +1.0, -1.0, -1.0, +1.0, +1.0 };
+	double ZIIZ[8] = { -1.0, -1.0, -1.0, -1.0, +1.0, +1.0, +1.0, +1.0 };
+
+	double XF[2] = { 1.0 - XLOC, 1.0 + XLOC };
+	double YF[2] = { 1.0 - YLOC, 1.0 + YLOC };
+	double ZF[2] = { 1.0 - ZLOC, 1.0 + ZLOC };
+
+	double FX[8] = { XF[0], XF[1], XF[1], XF[0], XF[0], XF[1], XF[1], XF[0] };
+	double FY[8] = { YF[0], YF[0], YF[1], YF[1], YF[0], YF[0], YF[1], YF[1] };
+	double FZ[8] = { ZF[0], ZF[0], ZF[0], ZF[0], ZF[1], ZF[1], ZF[1], ZF[1] };
+	double DFDXL[8]{};
+	double DFDYL[8]{};
+	double DFDZL[8]{};
+	
+	for (int i = 0; i < 8; i++)
+	{
+		DFDXL[i] = XIIX[i] * 0.125 * FY[i] * FZ[i];
+		DFDYL[i] = YIIY[i] * 0.125 * FX[i] * FZ[i];
+		DFDZL[i] = ZIIZ[i] * 0.125 * FX[i] * FY[i];
+	}
+	for (int i = 0; i < 9; i++)
+		CJ[i] = 0.0;
+
+	for (int il = 0; il < 8; il++)
+	{
+		int ii = L * 8 + il;
+		int i = incidence_vector[ii];
+		i = i - 1;
+		CJ[0] = CJ[0] + DFDXL[il] * node_x[i];
+		CJ[1] = CJ[1] + DFDXL[il] * node_y[i];
+		CJ[2] = CJ[2] + DFDXL[il] * node_z[i];
+
+
+		CJ[3] = CJ[3] + DFDYL[il] * node_x[i];
+		CJ[4] = CJ[4] + DFDYL[il] * node_y[i];
+		CJ[5] = CJ[5] + DFDYL[il] * node_z[i];
+
+		CJ[6] = CJ[6] + DFDZL[il] * node_x[i];
+		CJ[7] = CJ[7] + DFDZL[il] * node_y[i];
+		CJ[8] = CJ[8] + DFDZL[il] * node_z[i];
+	}
+
+	DET = CJ[0] * (CJ[4] * CJ[8] - CJ[7] * CJ[5]) - CJ[3] * (CJ[1] * CJ[8] - CJ[7] * CJ[2]) +
+		CJ[6] * (CJ[1] * CJ[5] - CJ[4] * CJ[2]);
+}
 void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, double F[],double W[], double& DET, double CJ[],
 	double DFDXG[],double DFDYG[],double DFDZG[],double DWDXG[],double DWDYG[],double DWDZG[],double& swbg,double& relkbg,
 	double &vxg,double & vyg,double&vzg,double&vgmag,double& swtg,double&relktg,double &viscg,double& rhog,double&rgxg,double&rgyg,double&rgzg,double& porg)
@@ -3240,9 +3260,9 @@ void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, do
 	double FX[8] = { XF[0], XF[1], XF[1], XF[0], XF[0], XF[1], XF[1], XF[0] };
 	double FY[8] = { YF[0], YF[0], YF[1], YF[1], YF[0], YF[0], YF[1], YF[1] };
 	double FZ[8] = { ZF[0], ZF[0], ZF[0], ZF[0], ZF[1], ZF[1], ZF[1], ZF[1] };
-	double * DFDXL = new double[8]{};
-	double * DFDYL = new double[8]{};
-	double * DFDZL = new double[8]{};
+	double DFDXL[8]{};
+	double DFDYL[8]{};
+	double DFDZL[8]{};
 	for (int i = 0; i < 8; i++)
 		F[i] = 0.125 *FX[i] * FY[i] * FZ[i];
 
@@ -3280,14 +3300,11 @@ void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, do
 		CJ[6] * (CJ[1] * CJ[5] - CJ[4] * CJ[2]);
 	//cj = CJ;
 	if (ICALL == 0){
-		delete[] DFDXL;
-		delete[] DFDYL;
-		delete[] DFDZL;
 		return;
 	}
 
 	double ODET = 1.0 / DET;
-	double * CIJ = new double[9]{0};
+	double CIJ[9]={0,0,0,0,0,0,0,0,0};
 
 	CIJ[0] = +ODET * (CJ[4] * CJ[8] - CJ[7] * CJ[5]);
 	CIJ[1] = -ODET * (CJ[1] * CJ[8] - CJ[7] * CJ[2]);
@@ -3424,10 +3441,7 @@ void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, do
 			DWDYG[i] = DFDYG[i];
 			DWDZG[i] = DFDZG[i];
 		}
-		delete[] CIJ;
-		delete[] DFDXL;
-		delete[] DFDYL;
-		delete[] DFDZL;
+
 		return;
 	
 	fv:
@@ -3447,9 +3461,9 @@ void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, do
 	xixi = 0.75*aa*XF[0] * XF[1];
 	yiyi = 0.75*bb*YF[0] * YF[1];
 	zizi = 0.75*gg*ZF[0] * ZF[1];
-	double * AFX = new double[8];
-	double * AFY = new double[8];
-	double * AFZ = new double[8];
+	double  AFX[8];
+	double  AFY[8];
+	double  AFZ[8];
 	for (int i = 0; i < 8; i++)
 	{
 		AFX[i] = 0.5*FX[i] + XIIX[i] * xixi;
@@ -3465,9 +3479,9 @@ void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, do
 	double thaax = 0.5 - 1.5*aa*XLOC;
 	double thbby = 0.5 - 1.5*bb*YLOC;
 	double thggz = 0.5 - 1.5*gg*ZLOC;
-	double * XDW = new double[8];
-	double * YDW = new double[8];
-	double * ZDW = new double[8];
+	double XDW[8];
+	double YDW[8];
+	double ZDW[8];
 
 	for (int i = 0; i < 8; i++)
 	{
@@ -3477,9 +3491,9 @@ void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, do
 	}
 
 	// calculate derivatives wrt local
-	double * DWDXL = new double[8];
-	double * DWDYL = new double[8];
-	double * DWDZL = new double[8];
+	double DWDXL[8];
+	double DWDYL[8];
+	double DWDZL[8];
 
 	for (int i = 0; i < 8; i++)
 	{
@@ -3497,19 +3511,6 @@ void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, do
 		DWDZG[i] = CIJ[6] * DWDXL[i] + CIJ[7] * DWDYL[i] + CIJ[8] * DWDZL[i];
 	}
 
-	delete[] DWDXL;
-	delete[] DWDYL;
-	delete[] DWDZL;
-	delete[] XDW;
-	delete[] YDW;
-	delete[] ZDW;
-	delete[] AFX;
-	delete[] AFY;
-	delete[] AFZ;
-	delete[] CIJ;
-	delete[] DFDXL;
-	delete[] DFDYL;
-	delete[] DFDZL;
 }
 
 
@@ -3718,7 +3719,7 @@ void Storage::DISPR3(double vx,double vy,double vz,double vmag,double ang1,doubl
 	TENSYM(DL, dt1, dt2,rotmat, dxx, dxy, dxz, dyx, dyy, dyz, dzx, dzy, dzz);
 }
 
-void Storage::ROTATE(std::vector<double> vec, double v1, double v2, double v3, std::vector<double>& out_vec)
+void Storage::ROTATE(std::vector<double>& vec, double& v1, double& v2, double& v3, std::vector<double>& out_vec)
 {
 	out_vec[0] = vec[0] * v1 + vec[1] * v2 + vec[2] * v3;
 	out_vec[1] = vec[3] * v1 + vec[4] * v2 + vec[5] * v3;
@@ -3762,7 +3763,7 @@ void Storage::GLOCOL(int L, double vole[], double bflowe[8][8], double dflowe[],
 			if (found)
 			{
 				if (m != -1)
-					PMAT[m] = PMAT[m] + bflowe[je][ie];
+					PMAT[m] = PMAT[m] + bflowe[ie][je];
 				else
 					SimulationControl::exitOnError(" m negative");
 			}
@@ -3806,7 +3807,7 @@ void Storage::GLOCOL(int L, double vole[], double bflowe[8][8], double dflowe[],
 				if (found)
 				{
 					if (m != -1)
-						UMAT[m] = UMAT[m] + dtrane[je][ie] + btrane[je][ie];
+						UMAT[m] = UMAT[m] + dtrane[ie][je] + btrane[ie][je];
 					else
 						SimulationControl::exitOnError(" m negative");
 				}

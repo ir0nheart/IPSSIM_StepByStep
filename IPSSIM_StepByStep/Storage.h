@@ -12,6 +12,8 @@ class Storage
 {
 public:
 	static Storage * instance();
+	void BASIS3_Simple(int L, double XLOC, double YLOC, double ZLOC, double& DET, double CJ[]);
+
 	void BUBSAT(double& SWB, double& RELKB, double PRES, double CNUB, double & RELKT, double& SWT, double SW, double RELK);
 	void DISPR3(double vx, double vy, double vz, double vmag, double ang1, double ang2, double ang3,
 		double ALMAX, double ALMID, double ALMIN, double ATMAX, double ATMID, double ATMIN,
@@ -23,7 +25,7 @@ public:
 	void ELEMN3();
 	void NODAL();
 	void BC();
-	void ROTATE(std::vector<double> vec, double v1, double v2, double v3, std::vector<double>& out_vec);
+	void ROTATE(std::vector<double>& vec, double& v1, double& v2, double& v3, std::vector<double>& out_vec);
 	void BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, double F[],double W[], double& DET,double CJ[],
 		double DFDXG[],double DFDYG[],double DFDZG[],double DWDXG[],double DWDYG[],double DWDZG[],double & swbg,double& relkbg,
 		double & vxg,double&vyg,double & vzg,double & vgmag,double& swtg,double&relktg,double &viscg,double & rhog,double &rgxg,double&rgyg,double&rgzg,double &porg);
