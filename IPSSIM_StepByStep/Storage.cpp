@@ -2498,7 +2498,7 @@ BEGIN_ITERATION:
 			// Preconditioner
 			viennacl::linalg::ilu0_tag my_tag;
 			viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0_precond(A, my_tag);
-			viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 2000);
+			viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 2000,40);
 			viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
 			my_gmres_solver.set_monitor(my_custom_monitor<viennacl::vector<double>, double, viennacl::compressed_matrix<double> >, &my_monitor_data);
 			my_gmres_solver.set_initial_guess(init_guess);
@@ -2561,7 +2561,7 @@ BEGIN_ITERATION:
 				// Preconditioner
 				viennacl::linalg::ilu0_tag my_tag;
 				viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0(A, my_tag);
-				viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 1600);
+				viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 1600,40);
 				viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
 				my_gmres_solver.set_monitor(my_custom_monitor<viennacl::vector<double>, double, viennacl::compressed_matrix<double> >, &my_monitor_data);
 				my_gmres_solver.set_initial_guess(init_guess);
