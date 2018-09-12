@@ -1874,6 +1874,7 @@ void Storage::allocate_node_arrays()
 		node_swt = new double[NN]{};
 		node_swb = new double[NN]{};
 		node_cnub = new double[NN]{};
+		node_cnubm1 = new double[NN]{};
 		node_dswdp = new double[NN]{};
 		node_cs1 = new double[NN]{};
 		node_cs2 = new double[NN]{};
@@ -2342,6 +2343,68 @@ BEGIN_ITERATION:
 
 		BC();
 
+
+		std::ofstream outbin("C:/Users/demiryurek.a/Desktop/pvec_uvec/p_rhs.bin", std::ios::binary);
+		for (int i = 0; i < NN; i++)
+			outbin.write(reinterpret_cast < const char*>(&node_p_rhs[0] + i), sizeof(double));
+		outbin.close();
+
+		outbin.open("C:/Users/demiryurek.a/Desktop/pvec_uvec/u_rhs.bin", std::ios::binary);
+		for (int i = 0; i < NN; i++)
+			outbin.write(reinterpret_cast < const char*>(&node_u_rhs[0] + i), sizeof(double));
+		outbin.close();
+
+		outbin.open("C:/Users/demiryurek.a/Desktop/pvec_uvec/u_MAT.bin", std::ios::binary);
+		for (int i = 0; i < NELT; i++)
+			outbin.write(reinterpret_cast < const char*>(&UMAT[0] + i), sizeof(double));
+		outbin.close();
+		outbin.open("C:/Users/demiryurek.a/Desktop/pvec_uvec/p_MAT.bin", std::ios::binary);
+		for (int i = 0; i < NELT; i++)
+			outbin.write(reinterpret_cast < const char*>(&PMAT[0] + i), sizeof(double));
+		outbin.close();
+
+
+	/*	std::ofstream outbin("p_rhs.bin", std::ios::binary);
+		for (int i = 0; i < NN; i++)
+			outbin.write(reinterpret_cast<const char*>(&node_p_rhs[i]), sizeof(double));
+		outbin.close();*/
+
+
+		/*
+		 * 
+
+	for (int i = 0; i < 16621000;i++)
+		d[i] = i+0.123456789012345;
+	std::ofstream outbin("C:/Users/demiryurek.a/Desktop/pvec_uvec/p_rhs.bin", std::ios::binary);
+	for (int i = 0; i < 16621000; i++){
+
+
+		outbin.write(reinterpret_cast<const char *>(&d[0]+i), sizeof(double));
+	}	
+	outbin.close();
+	
+	std::streampos size;
+	char * memblock;
+	std::ifstream inbin("C:/Users/demiryurek.a/Desktop/pvec_uvec/p_rhs.bin", std::ios::in | std::ios::binary | std::ios::ate);
+
+	if (inbin.is_open())
+	{
+	size = inbin.tellg();
+	memblock = new char[size];
+	inbin.seekg(0, std::ios::beg);
+	inbin.read(memblock, size);
+	inbin.close();
+
+	std::cout << "the entire file content is in memory";
+	double * double_values = (double*)memblock;
+
+	delete[] memblock;
+	}
+	else 
+	std::cout << "Unable to open file";
+
+		 */
+		
 		double pnorm = DNRM2(NN, node_p_rhs, 1);
 		if (pnorm == 0)
 		{
@@ -2353,6 +2416,7 @@ BEGIN_ITERATION:
 			// if but we will try gmres
 			// solve for p;
 			// convert to row compressed
+
 			re_orient_matrix(NN + 1, NELT, PMAT, JA, IA, new_MAT, row_jumper, col_indices);
 			// set vienna cl rhs vector
 			viennacl::vector<double> vcl_rhs = viennacl::scalar_vector<double>(NN, 0.0);
