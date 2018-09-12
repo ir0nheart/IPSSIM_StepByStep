@@ -8,6 +8,41 @@
 #include "InputFiles.h"
 Storage * Storage::m_pInstance = nullptr;
 
+template<typename MatrixT, typename VectorT>
+struct monitor_user_data
+{
+	monitor_user_data(MatrixT const & A, VectorT const & b, VectorT const & guess) : A_ptr(&A), b_ptr(&b), guess_ptr(&guess) {}
+
+	MatrixT const *A_ptr;
+	VectorT const *b_ptr;
+	VectorT const *guess_ptr;
+};
+
+/**
+*  The actual callback-routine takes the current approximation to the result as the first parameter, and the current estimate for the relative residual norm as second argument.
+*  The third argument is a pointer to our user-data, which in a first step cast to the correct type.
+*  If the monitor returns true, the iterative solver stops. This is handy for defining custom termination criteria, e.g. one-norms for the result change.
+*  Since we do not want to terminate the iterative solver with a custom criterion here, we always return 'false' at the end of the function.
+*
+*  Note to type-safety evangelists: This void*-interface is designed to be later exposed through a shared library ('libviennacl').
+*  Thus, user types may not be known at the point of compilation, requiring a void*-approach.
+**/
+template<typename VectorT, typename NumericT, typename MatrixT>
+bool my_custom_monitor(VectorT const & current_approx, NumericT residual_estimate, void *user_data)
+{
+	// Extract residual:
+	monitor_user_data<MatrixT, VectorT> const *data = reinterpret_cast<monitor_user_data<MatrixT, VectorT> const*>(user_data);
+
+	// Form residual r = b - A*x, taking an initial guess into account: r = b - A * (current_approx + x_initial)
+	VectorT x = current_approx + *data->guess_ptr;
+	VectorT residual = *data->b_ptr - viennacl::linalg::prod(*data->A_ptr, x);
+	VectorT initial_residual = *data->b_ptr - viennacl::linalg::prod(*data->A_ptr, *data->guess_ptr);
+
+	std::cout << "Residual estimate vs. true residual: " << residual_estimate << " vs. " << viennacl::linalg::norm_2(residual) / viennacl::linalg::norm_2(initial_residual) << std::endl;
+
+	return false; // no termination of iteration
+}
+
 Storage * Storage::instance()
 {
 	if (m_pInstance == nullptr)
@@ -682,7 +717,7 @@ void Storage::PTRSET()
 	// ALLOCATE PMAT UMAT
 	PMAT = new double[NELT];
 	UMAT = new double[NELT];
-	new_MAT = new double[NELT];
+	new_MAT = new double[NELT]{};
 	row_jumper = new int[NN + 1]{};
 	col_indices = new int[NELT]{};
 }
@@ -2343,25 +2378,38 @@ BEGIN_ITERATION:
 
 		BC();
 
-
-		std::ofstream outbin("C:/Users/demiryurek.a/Desktop/pvec_uvec/p_rhs.bin", std::ios::binary);
+		std::string f_file = "p_vec";
+		f_file.append(std::to_string(IT));
+		f_file.append(".bin");
+		
+		std::ofstream outpvecbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
 		for (int i = 0; i < NN; i++)
-			outbin.write(reinterpret_cast < const char*>(&node_p_rhs[0] + i), sizeof(double));
-		outbin.close();
+			outpvecbin.write(reinterpret_cast < const char*>(&node_p_rhs[0] + i), sizeof(double));
+		outpvecbin.close();
 
-		outbin.open("C:/Users/demiryurek.a/Desktop/pvec_uvec/u_rhs.bin", std::ios::binary);
+		f_file = "u_vec";
+		f_file.append(std::to_string(IT));
+		f_file.append(".bin");
+		std::ofstream outuvecbin("C:/Users/demiryurek.a/Mishac/pvec_uvec/" + f_file, std::ios::binary);
 		for (int i = 0; i < NN; i++)
-			outbin.write(reinterpret_cast < const char*>(&node_u_rhs[0] + i), sizeof(double));
-		outbin.close();
+			outuvecbin.write(reinterpret_cast < const char*>(&node_u_rhs[0] + i), sizeof(double));
+		outuvecbin.close();
 
-		outbin.open("C:/Users/demiryurek.a/Desktop/pvec_uvec/u_MAT.bin", std::ios::binary);
+		f_file = "u_MAT";
+		f_file.append(std::to_string(IT));
+		f_file.append(".bin");
+		std::ofstream outumatbin("C:/Users/demiryurek.a/Mishac/pvec_uvec/" + f_file, std::ios::binary);
 		for (int i = 0; i < NELT; i++)
-			outbin.write(reinterpret_cast < const char*>(&UMAT[0] + i), sizeof(double));
-		outbin.close();
-		outbin.open("C:/Users/demiryurek.a/Desktop/pvec_uvec/p_MAT.bin", std::ios::binary);
+			outumatbin.write(reinterpret_cast < const char*>(&UMAT[0] + i), sizeof(double));
+		outumatbin.close();
+
+		f_file = "p_MAT";
+		f_file.append(std::to_string(IT));
+		f_file.append(".bin");
+		std::ofstream outpmatbin("C:/Users/demiryurek.a/Mishac/pvec_uvec/" + f_file, std::ios::binary);
 		for (int i = 0; i < NELT; i++)
-			outbin.write(reinterpret_cast < const char*>(&PMAT[0] + i), sizeof(double));
-		outbin.close();
+			outpmatbin.write(reinterpret_cast < const char*>(&PMAT[0] + i), sizeof(double));
+		outpmatbin.close();
 
 
 	/*	std::ofstream outbin("p_rhs.bin", std::ios::binary);
@@ -2425,12 +2473,37 @@ BEGIN_ITERATION:
 			// Set Matrix;
 			viennacl::compressed_matrix<double> A;
 			A.set(row_jumper, col_indices, new_MAT, NN, NN,NELT);
-			
+
+			/**
+			* As initial guess we take a vector consisting of all 0.9s, except for the first entry, which we set to zero:
+			**/
+			viennacl::vector<double> init_guess = viennacl::scalar_vector<double>(A.size2(), double(0.9));
+			init_guess[0] = 0;
+
+			/**
+			* Set up the monitor data, holding the system matrix, the right hand side, and the initial guess:
+			**/
+			monitor_user_data<viennacl::compressed_matrix<double>, viennacl::vector<double> > my_monitor_data(A, vcl_rhs, init_guess);
+
+
+			for (int i = 0; i < NN + 1; i++)
+			{
+				row_jumper[i] = 0;
+			}
+			for (int i = 0; i < NELT; i++)
+			{
+				col_indices[i] = 0;
+				new_MAT[i] = 0;
+			}
 			// Preconditioner
-			viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0_precond(A, viennacl::linalg::ilu0_tag());
+			viennacl::linalg::ilu0_tag my_tag;
+			viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0_precond(A, my_tag);
 			viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 2000);
 			viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
-			viennacl::vector<double> vcl_results = my_gmres_solver(A, vcl_rhs, ilu0_precond);
+			my_gmres_solver.set_monitor(my_custom_monitor<viennacl::vector<double>, double, viennacl::compressed_matrix<double> >, &my_monitor_data);
+			my_gmres_solver.set_initial_guess(init_guess);
+			viennacl::vector<double> vcl_results(A.size2());
+			vcl_results= my_gmres_solver(A, vcl_rhs, ilu0_precond);
 			for (int i = 0; i < NN; i++)
 				node_p_rhs[i] = vcl_results[i];
 			int ITRS = my_gmres_solver.tag().iters();
@@ -2462,14 +2535,40 @@ BEGIN_ITERATION:
 					vcl_rhs[i] = node_u_rhs[i];
 				// Set Matrix;
 				viennacl::compressed_matrix<double> A;
-				A.set(row_jumper, col_indices, new_MAT, NELT, NN, NN);
+				A.set(row_jumper, col_indices, new_MAT, NN, NN,NELT);
+
+				/**
+				* As initial guess we take a vector consisting of all 0.9s, except for the first entry, which we set to zero:
+				**/
+				viennacl::vector<double> init_guess = viennacl::scalar_vector<double>(A.size2(), double(0.9));
+				init_guess[0] = 0;
+
+				/**
+				* Set up the monitor data, holding the system matrix, the right hand side, and the initial guess:
+				**/
+				monitor_user_data<viennacl::compressed_matrix<double>, viennacl::vector<double> > my_monitor_data(A, vcl_rhs, init_guess);
+
+
+				for (int i = 0; i < NN + 1; i++)
+				{
+					row_jumper[i] = 0;
+				}
+				for (int i = 0; i < NELT; i++)
+				{
+					col_indices[i] = 0;
+					new_MAT[i] = 0;
+				}
 				// Preconditioner
-				viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0(A, viennacl::linalg::ilu0_tag());
+				viennacl::linalg::ilu0_tag my_tag;
+				viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0(A, my_tag);
 				viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 1600);
 				viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
-				viennacl::vector<double> vcl_results = my_gmres_solver(A, vcl_rhs, ilu0);
+				my_gmres_solver.set_monitor(my_custom_monitor<viennacl::vector<double>, double, viennacl::compressed_matrix<double> >, &my_monitor_data);
+				my_gmres_solver.set_initial_guess(init_guess);
+				viennacl::vector<double> vcl_results(A.size2());
+				vcl_results = my_gmres_solver(A, vcl_rhs, ilu0);
 				for (int i = 0; i < NN; i++)
-					node_u_rhs[i] = vcl_rhs[i];
+					node_u_rhs[i] = vcl_results[i];
 				int ITRS = my_gmres_solver.tag().iters();
 				double ERR = my_gmres_solver.tag().error();
 			}
@@ -3378,7 +3477,7 @@ void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, do
 	CIJ[4] = +ODET * (CJ[0] * CJ[8] - CJ[6] * CJ[2]);
 	CIJ[5] = -ODET * (CJ[0] * CJ[5] - CJ[3] * CJ[2]);
 
-	CIJ[6] = +ODET * (CJ[3] * CJ[7] - CJ[6] * CJ[3]);
+	CIJ[6] = +ODET * (CJ[3] * CJ[7] - CJ[6] * CJ[4]);
 	CIJ[7] = -ODET * (CJ[0] * CJ[7] - CJ[6] * CJ[1]);
 	CIJ[8] = +ODET * (CJ[0] * CJ[4] - CJ[3] * CJ[1]);
 
