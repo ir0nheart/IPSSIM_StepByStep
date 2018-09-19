@@ -13,7 +13,8 @@ class Storage
 public:
 	static Storage * instance();
 	void BASIS3_Simple(int L, double XLOC, double YLOC, double ZLOC, double& DET, double CJ[]);
-
+	std::string setLSTLine(std::string s);
+	void banner();
 	void BUBSAT(double& SWB, double& RELKB, double PRES, double CNUB, double & RELKT, double& SWT, double SW, double RELK);
 	void DISPR3(double * vx, double * vy, double * vz, double * vmag, double * ang1, double * ang2, double * ang3,
 		double * ALMAX, double * ALMID, double * ALMIN, double * ATMAX, double * ATMID, double * ATMIN,

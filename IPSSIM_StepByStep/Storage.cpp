@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "Parser.h"
 #include "InputFiles.h"
+#include "Writer.h"
 Storage * Storage::m_pInstance = nullptr;
 
 template<typename MatrixT, typename VectorT>
@@ -756,6 +757,8 @@ void Storage::BANWID()
 
 void Storage::check_data_sets()
 {
+	Writer * lstWriter = Writer::instance("LST");
+	std::string logLine;
 	// Check Titles
 	if (titles.size() != 2)
 	{
@@ -763,23 +766,26 @@ void Storage::check_data_sets()
 		SimulationControl::exitOnError();
 	}
 
-	if (!strcmp(sutra_string.data() , "SUTRA"))
+
+	if (!strcmp(sutra_string.data(), "SUTRA"))
 	{
 		SimulationControl::exitOnError("INP-2A-1");
 	}
 
-	if (!strncmp(version_string.data(),"VERSION",7))
+	if (!strncmp(version_string.data(), "VERSION", 7))
 	{
 		if (version_num_string.data() == "2D3D.1")
 		{
-			version_num_string = std::vector<char>{'2','.','0'};
-		} else if (!strcmp(version_num_string.data(),"2.0") &&
-			!strcmp(version_num_string.data(),"2.1") &&
+			version_num_string = std::vector<char>{'2', '.', '0'};
+		}
+		else if (!strcmp(version_num_string.data(), "2.0") &&
+			!strcmp(version_num_string.data(), "2.1") &&
 			!strcmp(version_num_string.data(), "2.2"))
 		{
 			SimulationControl::exitOnError("INP-2A-4");
 		}
-	} else
+	}
+	else
 	{
 		version_num_string = std::vector<char>{'2', '.', '0'};
 	}
@@ -787,24 +793,61 @@ void Storage::check_data_sets()
 	if (strcmp(simulation_type_string.data(), "SOLUTE"))
 	{
 		ME = -1;
-		std::cout << "SOLUTE TRANSPORT " << std::endl;
-	} else if (strcmp(simulation_type_string.data(), "ENERGY"))
+		logLine.append("\n\n");
+		logLine.append(std::string(132, '*'));
+		logLine.append("\n\n\n");
+		logLine.append(std::string(20, ' '));
+		logLine.append("* * * * *   I P S S I M   S O L U T E   T R A N S P O R T   S I M U L A T I O N   * * * * *\n\n\n");
+		logLine.append(std::string(132, '*'));
+		lstWriter->add_line(logLine);
+		logLine.clear();
+	}
+	else if (strcmp(simulation_type_string.data(), "ENERGY"))
 	{
 		ME = +1;
-		std::cout << "ENERGY TRANSPORT " << std::endl;
-	} else
+		//std::cout << "ENERGY TRANSPORT " << std::endl;
+		logLine.append("\n\n");
+		logLine.append(std::string(132, '*'));
+		logLine.append("\n\n\n");
+		logLine.append(std::string(20, ' '));
+		logLine.append("* * * * *   I P S S I M   E N E R G Y   T R A N S P O R T   S I M U L A T I O N   * * * * *\n\n\n");
+		logLine.append(std::string(132, '*'));
+		lstWriter->add_line(logLine);
+		logLine.clear();
+	}
+	else
 	{
-		std::cout << "Simulation TYPE is not Solute or Energy Transport " << std::endl;
+		//std::cout << "Simulation TYPE is not Solute or Energy Transport " << std::endl;
 		SimulationControl::exitOnError("INP-2A-2");
 	}
-	
-	if (!strncmp(mesh_dim_string.data(), "2D",2))
+
+	// Output Titles
+
+	logLine.append("\n\n\n\n ");
+	logLine.append(std::string(131, '-'));
+	logLine.append("\n\n");
+	logLine.append(std::string(26, ' '));
+	logLine.append(titles[0]);
+	logLine.append("\n\n");
+	logLine.append(std::string(26, ' '));
+	logLine.append(titles[1]);
+	logLine.append("\n\n ");
+	logLine.append(std::string(131, '-'));
+	lstWriter->add_line(logLine);
+	logLine.clear();
+
+	//Write File Assignments in LST file
+	InputFiles::instance()->printInputFilesToLST();
+
+	if (!strncmp(mesh_dim_string.data(), "2D", 2))
 	{
 		KTYPE.push_back(2);
-	} else if (!strncmp(mesh_dim_string.data(), "3D",2))
+	}
+	else if (!strncmp(mesh_dim_string.data(), "3D", 2))
 	{
 		KTYPE.push_back(3);
-	} else
+	}
+	else
 	{
 		std::cout << "Error in Mesh type definition." << std::endl;
 		std::cout << "\t Mesh type should be either '2D' or '3D'" << std::endl;
@@ -812,7 +855,7 @@ void Storage::check_data_sets()
 	}
 
 	// This program runs only REGULAR and IRREGULAR MESH
-	if (!strncmp(mesh_type_string.data(), "REGULAR",mesh_type_string.size()))
+	if (!strncmp(mesh_type_string.data(), "REGULAR", mesh_type_string.size()))
 	{
 		KTYPE.push_back(2);
 		if (KTYPE[0] == 2)
@@ -820,7 +863,8 @@ void Storage::check_data_sets()
 			NN1 = std::stoi(std::string(nn1_string.begin(), nn1_string.end()));
 			NN2 = std::stoi(std::string(nn2_string.begin(), nn2_string.end()));
 			NN3 = 1;
-		} else if (KTYPE[0] == 3)
+		}
+		else if (KTYPE[0] == 3)
 		{
 			NN1 = std::stoi(std::string(nn1_string.begin(), nn1_string.end()));
 			NN2 = std::stoi(std::string(nn2_string.begin(), nn2_string.end()));
@@ -831,10 +875,12 @@ void Storage::check_data_sets()
 			SimulationControl::exitOnError("INP-2B-3");
 		}
 
-	} else if (!strncmp(mesh_type_string.data(), "IRREGULAR",mesh_type_string.size()))
+	}
+	else if (!strncmp(mesh_type_string.data(), "IRREGULAR", mesh_type_string.size()))
 	{
 		KTYPE.push_back(0);
-	} else
+	}
+	else
 	{
 		std::cout << "Mesh is not REGULAR or IRREGULAR" << std::endl;
 		SimulationControl::exitOnError("INP-2B-4");
@@ -852,7 +898,8 @@ void Storage::check_data_sets()
 		if (KTYPE[0] == 3)
 		{
 			NE123 = (NN1 - 1)*(NN2 - 1)*(NN3 - 1);
-		} else
+		}
+		else
 		{
 			NE123 = (NN1 - 1)*(NN2 - 1);
 		}
@@ -862,34 +909,112 @@ void Storage::check_data_sets()
 		}
 	}
 
-	if (!strncmp(simulation_condition_string.data(), "UNSATURATED",simulation_condition_string.size()))
+
+	logLine.append("\n\n\n\n           S I M U L A T I O N   M O D E   O P T I O N S\n\n");
+
+	if (!strncmp(simulation_condition_string.data(), "UNSATURATED", simulation_condition_string.size())){
 		IUNSAT = +1;
-	else if (!strncmp(simulation_condition_string.data(), "SATURATED", simulation_condition_string.size()))
+		logLine.append("           - ALLOW UNSATURATED AND SATURATED FLOW: UNSATURATED PROPERTIES ARE USER-PROGRAMMED IN UNSAT \n");
+	}
+	else if (!strncmp(simulation_condition_string.data(), "SATURATED", simulation_condition_string.size())){
 		IUNSAT = 0;
-	else
+		logLine.append("           - ASSUME SATURATED FLOW ONLY \n");
+	}
+	else{
 		SimulationControl::exitOnError("INP-4-1");
+	}
 
 
-	if (!strncmp(flow_type_string.data(), "TRANSIENT",flow_type_string.size()))
+	if (!strncmp(flow_type_string.data(), "TRANSIENT", flow_type_string.size())){
 		ISSFLO = 0;
-	else if (!strncmp(flow_type_string.data(), "STEADY", flow_type_string.size()))
+		logLine.append("           - ALLOW TIME-DEPENDENT FLOW FIELD \n");
+	}
+	else if (!strncmp(flow_type_string.data(), "STEADY", flow_type_string.size())){
 		ISSFLO = +1;
-	else
+		if (ME == -1)
+			logLine.append("           - ASSUME STEADY-STATE FLOW FIELD CONSISTENT WITH INITIAL CONCENTRATION CONDITIONS \n");
+		if (ME == +1)
+			logLine.append("           - ASSUME STEADY-STATE FLOW FIELD CONSISTENT WITH INITIAL TEMPERATURE CONDITIONS \n");
+	}
+	else{
 		SimulationControl::exitOnError("INP-4-2");
+	}
 
-	if (!strncmp(transport_type_string.data(), "TRANSIENT", transport_type_string.size()))
+
+
+	if (!strncmp(transport_type_string.data(), "TRANSIENT", transport_type_string.size())){
 		ISSTRA = 0;
-	else if (!strncmp(transport_type_string.data(), "STEADY", transport_type_string.size()))
+		logLine.append("           - ALLOW TIME-DEPENDENT TRANSPORT \n");
+	}
+	else if (!strncmp(transport_type_string.data(), "STEADY", transport_type_string.size())){
 		ISSTRA = +1;
-	else
+		logLine.append("           - ASSUME STEADY-STATE TRANSPORT \n");
+	}
+	else{
 		SimulationControl::exitOnError("INP-4-3");
+	}
 
-	if (!strncmp(simulation_start_string.data(), "COLD", simulation_start_string.size()))
+
+	if (!strncmp(simulation_start_string.data(), "COLD", simulation_start_string.size())){
 		IREAD = +1;
-	else if (!strncmp(simulation_start_string.data(), "WARM", simulation_start_string.size()))
+		logLine.append("           - COLD START - BEGIN NEW SIMULATION \n");
+	}
+	else if (!strncmp(simulation_start_string.data(), "WARM", simulation_start_string.size())){
 		IREAD = -1;
-	else
+		logLine.append("           - WARM START - SIMULATION IS TO BE CONTINUED FROM PREVIOUSLY-STORED DATA \n");
+	}
+	else{
 		SimulationControl::exitOnError("INP-4-4");
+	}
+
+	if (solution_storage > 0)
+	{
+		logLine.append("           - STORE RESULTS AFTER EVERY ");
+		logLine.append(std::to_string(solution_storage));
+		logLine.append(" TIME STEPS IN RESTART FILE AS BACKUP AND FOR USE IN A SIMULATION RESTART\n");
+	}
+	else if (solution_storage == 0)
+	{
+		logLine.append("           - DO NOT STORE RESULTS FOR USE IN A RESTART OF SIMULATION \n");
+	}
+	
+	lstWriter->add_line(logLine);
+	logLine.clear();
+
+	if (ME == -1)
+	{
+		char buff[1024];
+		logLine.append("\n\n\n\n\n           S I M U L A T I O N   C O N T R O L   N U M B E R S\n\n");
+		_snprintf(buff, 1024, "        %9d     NUMBER OF NODES IN FINITE-ELEMENT MESH\n", NN);
+		logLine.append(buff);
+		_snprintf(buff, 1024, "        %9d     NUMBER OF ELEMENTS IN MESH\n\n", NN);
+		logLine.append(buff);
+		_snprintf(buff, 1024, "        %9d     EXACT NUMBER OF NODES IN MESH AT WHICH PRESSURE IS A SPECIFIED CONSTANT OR FUNCTION OF TIME\n", NPBC);
+		logLine.append(buff);
+		_snprintf(buff, 1024, "        %9d     EXACT NUMBER OF NODES IN MESH AT WHICH SOLUTE CONCENTRATION IS A SPECIFIED CONSTANT OR FUNCTION OF TIME\n", NUBC);
+		logLine.append(buff);
+		_snprintf(buff, 1024, "        %9d     EXACT NUMBER OF NODES IN MESH AT WHICH FLUID INFLOW OR OUTFLOW IS A SPECIFIED CONSTANT OR FUNCTION OF TIME\n", NSOP);
+		logLine.append(buff);
+		_snprintf(buff, 1024, "        %9d     EXACT NUMBER OF NODES IN MESH AT WHICH A SOURCE OR SINK OF SOLUTE MASS IS A SPECIFIED CONSTANT OR FUNCTION OF TIME\n\n", NSOU);
+		logLine.append(buff);
+		_snprintf(buff, 1024, "        %9d     EXACT NUMBER OF NODES IN MESH AT WHICH PRESSURE AND CONCENTRATION WILL BE OBSERVED\n", NOBS);
+		logLine.append(buff);
+		
+		logLine.append("\n\n\n\n\n           N U M E R I C A L   C O N T R O L   D A T A\n\n");
+		_snprintf(buff, 1024, "        %+15.5f     'UPSTREAM WEIGHTING' FACTOR\n", UP);
+		logLine.append(buff);
+		_snprintf(buff, 1024, "        %+15.4e     SPECIFIED PRESSURE BOUNDARY CONDITION FACTOR\n", GNUP);
+		logLine.append(buff);
+		_snprintf(buff, 1024, "        %+15.4e     SPECIFIED CONCENTRATION BOUNDARY CONDITION FACTOR\n", GNUU);
+		logLine.append(buff);
+
+		lstWriter->add_line(logLine);
+		logLine.clear();
+	}
+	else
+	{
+		SimulationControl::exitOnError("ENERGY TRANSPORT IS NOT IMPLEMENTED IN IPSSIM. ");
+	}
 
 	if (ISSTRA == 1 && ISSFLO != 1)
 	{
@@ -907,6 +1032,8 @@ void Storage::check_data_sets()
 	NSCHAU = 3;
 
 	// Evde Bakacam
+	logLine.append("\n\n\n\n\n           T E M P O R A L   C O N T R O L   A N D   S O L U T I O N   C Y C L I N G   D A T A\n\n");
+
 
 
 	std::vector<std::pair<int, double>> step_time;
@@ -931,11 +1058,23 @@ void Storage::check_data_sets()
 		schedule_list[3]->add_step_time(step, time);
 
 		ITMAX = 1;
+		char buff[1024];
+		logLine.append("\n             NOTE: BECAUSE FLOW AND TRANSPORT ARE STEADY-STATE, USER-DEFINED SCHEDULES ARE NOT IN EFFECT.");
+		logLine.append("\n             STEADY-STATE RESULTS WILL BE WRITTEN TO THE APPROPRIATE OUTPUT FILES.");
+		_snprintf(buff, 1024, "\n\n          THE FOLLOWING %d SCHEDULES CAN BE USED TO CONTROL SPECIFICATIONS OF STEADY-STATE BOUNDARY", NSCH);
+		logLine.append(buff);
+		logLine.append("\n             CONDITIONS IN (OPTIONAL) .BCS FILES:");
+		logLine.append("\n                SCHEDULE TIME_STEPS   CONSISTS OF TIME STEPS 0 (STEADY FLOW) AND 1 (STEADY TRANSPORT);\n");
+		logLine.append(std::string(41, ' '));
+		logLine.append("THIS SCHEDULE IS DEFINED AUTOMATICALLY BY IPSSIM\n");
+		lstWriter->add_line(logLine);
 		goto _l846;
 	}
 
 	NSCH = NSCH + NSCHAU;
-
+	char buff[1024];
+	_snprintf(buff, 1024, "\n             THE %5d SCHEDULES ARE LISTED BELOW. SCHEDULE 'TIME_STEPS' CONTROLS TIME STEPPING.\n",NSCH);
+	logLine.append(buff);
 	schedule_list.reserve(NSCH);
 	// READ SCHEDULE NAME AND TYPE
 	// BASED ON TYPE CONSTRUCT SCHEDULE
@@ -982,7 +1121,27 @@ void Storage::check_data_sets()
 				TIME = STEP;
 				schedule_list[i]->add_step_time(STEP, TIME);
 			}
-			std::cout << "bitti" << std::endl;
+
+			logLine.append("\n");
+			logLine.append(std::string(16, ' '));
+			logLine.append("SCHEDULE ");
+			logLine.append(schedule_list[i]->get_name());
+			logLine.append("   STEP CYCLE WITH THE FOLLOWING SPECIFICATIONS:\n");
+			logLine.append(std::string(40, ' '));
+			_snprintf(buff, 1024, "%8d     MAXIMUM NUMBER OF TIME AFTER INITIAL TIME STEP NUMBER\n",NSMAX);
+			logLine.append(buff);
+			logLine.append(std::string(40, ' '));
+			_snprintf(buff, 1024, "%8d     INITIAL TIME STEP NUMBER\n",ISTEPI);
+			logLine.append(buff);
+			logLine.append(std::string(40, ' '));
+			_snprintf(buff, 1024, "%8d     LIMITING TIME STEP NUMBER\n", ISTEPL);
+			logLine.append(buff);
+			logLine.append(std::string(40, ' '));
+			_snprintf(buff, 1024, "%8d     TIME STEP INCREMENT\n", ISTEPC);
+			logLine.append(buff);
+			lstWriter->add_line(logLine);
+			logLine.clear();
+
 		} else if (schedule_list[i]->get_type() == "TIME CYCLE")
 		{
 			schedule_list[i]->set_sbased(false);
@@ -1063,6 +1222,40 @@ void Storage::check_data_sets()
 				if (time >= TIMEL)
 					break;
 			}
+			logLine.append("\n");
+			logLine.append(std::string(16, ' '));
+			logLine.append("SCHEDULE ");
+			logLine.append(schedule_list[i]->get_name());
+			logLine.append("   TIME CYCLE WITH THE FOLLOWING SPECIFICATIONS IN TERMS OF ");
+			logLine.append(CREFT);
+			logLine.append(" TIMES : \n");
+			logLine.append(std::string(46, ' '));
+			_snprintf(buff, 1024, "%8d     MAXIMUM NUMBER OF TIMES AFTER INITIAL TIME\n", NTMAX);
+			logLine.append(buff);
+			logLine.append(std::string(39, ' '));
+			_snprintf(buff, 1024, "%15.7e     INITIAL TIME\n", TIMEI);
+			logLine.append(buff);
+			logLine.append(std::string(39, ' '));
+			_snprintf(buff, 1024, "%15.7e     LIMITING TIME\n", TIMEL);
+			logLine.append(buff);
+			logLine.append(std::string(39, ' '));
+			_snprintf(buff, 1024, "%15.7e     INITIAL TIME INCREMENT\n", TIMEC);
+			logLine.append(buff);
+
+			logLine.append(std::string(46, ' '));
+			_snprintf(buff, 1024, "%8d     TIME INCREMENT CHANGE CYCLE\n", NTCYC);
+			logLine.append(buff);
+			logLine.append(std::string(39, ' '));
+			_snprintf(buff, 1024, "%15.7e     TIME INCREMENT MULTIPLIER\n", TIMEI);
+			logLine.append(buff);
+			logLine.append(std::string(39, ' '));
+			_snprintf(buff, 1024, "%15.7e     MINIMUM TIME INCREMENT\n", TIMEL);
+			logLine.append(buff);
+			logLine.append(std::string(39, ' '));
+			_snprintf(buff, 1024, "%15.7e     MAXIMUM TIME INCREMENT\n", TIMEC);
+			logLine.append(buff);
+			lstWriter->add_line(logLine);
+			logLine.clear();
 		}
 		else if (schedule_list[i]->get_type() == "TIME LIST")
 		{
@@ -1264,6 +1457,14 @@ void Storage::check_data_sets()
 
 	_l846:
 	// Writes
+
+
+
+
+
+
+
+
 	if (ISSFLO == 1)
 	{
 		NPCYC = ITMAX + 1;
@@ -1296,6 +1497,7 @@ void Storage::check_data_sets()
 	{
 		Parser::instance()->mapFile(InputFiles::instance()->getFilesForReading()["BCS"]);
 		Parser::instance()->extractBCS();
+		SimulationControl::wConsole("\t BCS are extracted.", 10);
 	}
 
 	// Create Nodes
@@ -2461,46 +2663,6 @@ BEGIN_ITERATION:
 		outpmatbin.close();
 
 
-	/*	std::ofstream outbin("p_rhs.bin", std::ios::binary);
-		for (int i = 0; i < NN; i++)
-			outbin.write(reinterpret_cast<const char*>(&node_p_rhs[i]), sizeof(double));
-		outbin.close();*/
-
-
-		/*
-		 * 
-
-	for (int i = 0; i < 16621000;i++)
-		d[i] = i+0.123456789012345;
-	std::ofstream outbin("C:/Users/demiryurek.a/Desktop/pvec_uvec/p_rhs.bin", std::ios::binary);
-	for (int i = 0; i < 16621000; i++){
-
-
-		outbin.write(reinterpret_cast<const char *>(&d[0]+i), sizeof(double));
-	}	
-	outbin.close();
-	
-	std::streampos size;
-	char * memblock;
-	std::ifstream inbin("C:/Users/demiryurek.a/Desktop/pvec_uvec/p_rhs.bin", std::ios::in | std::ios::binary | std::ios::ate);
-
-	if (inbin.is_open())
-	{
-	size = inbin.tellg();
-	memblock = new char[size];
-	inbin.seekg(0, std::ios::beg);
-	inbin.read(memblock, size);
-	inbin.close();
-
-	std::cout << "the entire file content is in memory";
-	double * double_values = (double*)memblock;
-
-	delete[] memblock;
-	}
-	else 
-	std::cout << "Unable to open file";
-
-		 */
 		
 		double pnorm = DNRM2(NN, node_p_rhs, 1);
 		if (pnorm == 0)
@@ -4103,7 +4265,7 @@ void Storage::GLOCOL(int L, double vole[], double bflowe[8][8], double dflowe[],
 			if (found)
 			{
 				if (m != -1)
-					PMAT[m] = PMAT[m] + bflowe[je][ie];
+					PMAT[m] = PMAT[m] + bflowe[ie][je];
 				else
 					SimulationControl::exitOnError(" m negative");
 			}
@@ -4147,7 +4309,7 @@ void Storage::GLOCOL(int L, double vole[], double bflowe[8][8], double dflowe[],
 				if (found)
 				{
 					if (m != -1)
-						UMAT[m] = UMAT[m] + dtrane[je][ie] + btrane[je][ie];
+						UMAT[m] = UMAT[m] + dtrane[ie][je] + btrane[ie][je];
 					else
 						SimulationControl::exitOnError(" m negative");
 				}
@@ -4222,3 +4384,112 @@ void Storage::re_orient_matrix(int jmper_size, int vals_size, double vals[], std
 	delete[]rr;
 	delete[]nn;
 }
+
+
+void Storage::banner(){
+	std::string logLine = "";
+	Writer * logWriter = Writer::instance("LST");
+	std::string lstFile;
+	lstFile.append(InputFiles::instance()->getInputDirectory());
+	lstFile.append(InputFiles::instance()->getFilesForWriting()["LST"]);
+	logWriter->set_filename(lstFile);
+	for (int i = 0; i < 133; i++){
+		logLine.append("*");
+	}
+	logLine.append("\n\n\n");
+	for (int i = 0; i < 2; i++){
+		logLine.append(logLine);
+	}
+
+	logLine.append("\n\n\n\n\n");
+	logLine.append(std::string(37, ' ') + "II   PPPPPPP     SSS            SSS     II   MMMM      MMMM\n");
+	logLine.append(std::string(37, ' ') + "II   PP    PP  SS   SS        SS   SS   II   MM  MM  MM  MM\n");
+	logLine.append(std::string(37, ' ') + "II   PP    PP  SS             SS        II   MM    MM    MM\n");
+	logLine.append(std::string(37, ' ') + "II   PPPPPPP    SSSSS   ====   SSSSS    II   MM    MM    MM\n");
+	logLine.append(std::string(37, ' ') + "II   PP             SS             SS   II   MM          MM\n");
+	logLine.append(std::string(37, ' ') + "II   PP        SS   SS        SS   SS   II   MM          MM\n");
+	logLine.append(std::string(37, ' ') + "II   PP          SSS            SSS     II   MM          MM\n");
+	logLine.append("\n\n\n\n\n\n");
+	logLine.append(setLSTLine("N O R T H E A S T E R N   U N I V E R S I T Y"));
+	logLine.append("\n\n\n");
+	logLine.append(setLSTLine("INDUCED PARTIAL SATURATION SIMULATION"));
+	logLine.append("\n\n");
+	logLine.append(setLSTLine("-IPSSIM VERSION v1.0-"));
+	logLine.append("\n\n\n\n\n\n");
+	logWriter->add_line(logLine);
+	logLine.clear();
+	for (int j = 0; j < 3; j++){
+		for (int i = 0; i < 133; i++){
+			logLine.append("*");
+		}
+		logLine.append("\n\n\n");
+	}
+	for (int i = 0; i < 133; i++){
+		logLine.append("*");
+	}
+	logLine.append("\n\n");
+
+	logWriter->add_line(logLine);
+}
+
+std::string Storage::setLSTLine(std::string s){
+	int sLen = s.length();
+	std::string tempStr1 = "";
+	std::string tempStr2 = "";
+	std::string tempStr = "";
+	int p1, p2;
+	p1 = p2 = 0;
+	if ((133 - sLen) % 2 == 0){
+		p1 = p2 = (133 - sLen) / 2;
+	}
+	else{
+		p1 = (132 - sLen) / 2;
+		p2 = p1 + 1;
+	}
+	tempStr1 = std::string(p1, ' ');
+	tempStr2 = std::string(p2, ' ');
+	tempStr.append(tempStr1 + s + tempStr2);
+	return tempStr;
+
+}
+
+/*	std::ofstream outbin("p_rhs.bin", std::ios::binary);
+for (int i = 0; i < NN; i++)
+outbin.write(reinterpret_cast<const char*>(&node_p_rhs[i]), sizeof(double));
+outbin.close();*/
+
+
+/*
+*
+
+for (int i = 0; i < 16621000;i++)
+d[i] = i+0.123456789012345;
+std::ofstream outbin("C:/Users/demiryurek.a/Desktop/pvec_uvec/p_rhs.bin", std::ios::binary);
+for (int i = 0; i < 16621000; i++){
+
+
+outbin.write(reinterpret_cast<const char *>(&d[0]+i), sizeof(double));
+}
+outbin.close();
+
+std::streampos size;
+char * memblock;
+std::ifstream inbin("C:/Users/demiryurek.a/Desktop/pvec_uvec/p_rhs.bin", std::ios::in | std::ios::binary | std::ios::ate);
+
+if (inbin.is_open())
+{
+size = inbin.tellg();
+memblock = new char[size];
+inbin.seekg(0, std::ios::beg);
+inbin.read(memblock, size);
+inbin.close();
+
+std::cout << "the entire file content is in memory";
+double * double_values = (double*)memblock;
+
+delete[] memblock;
+}
+else
+std::cout << "Unable to open file";
+
+*/

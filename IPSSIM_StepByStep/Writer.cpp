@@ -63,25 +63,26 @@ void Writer::run()
 		goto checkFILE;
 	}
 
+	if (!done_writing){
 	checkContainer:
-	if (!writeContainer.empty())
-	{
-		str = writeContainer[0];
-		std::lock_guard<std::mutex> guard(mtx);
-		writeContainer.pop_front();
-		write_to_file(str);
-		goto checkContainer;
-	} else
-	{
+		if (!writeContainer.empty())
+		{
+			str = writeContainer[0];
+			std::lock_guard<std::mutex> guard(mtx);
+			writeContainer.pop_front();
+			write_to_file(str);
+			goto checkContainer;
+		}
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 		goto checkContainer;
+		
 	}
-
-	std::cout << " I am Writer " << name << " and running.." << std::endl;
 }
 Writer::Writer(std::string name)
 {
 	this->name = name;
+	done_writing = false;
+	newRun = true;
 }
 
 

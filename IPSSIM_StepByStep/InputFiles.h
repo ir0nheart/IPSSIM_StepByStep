@@ -12,8 +12,8 @@ public:
 	void setFilesForWriting();
 	void printAllFileInformation();
 
-	void getFileList();
-	std::string getInputDirectory();
+	//void getFileList();
+	std::string getInputDirectory(){ return input_directory; };
 	void checkInputFiles();
 	void printInputFilesToLST();
 	void readPropsINP();

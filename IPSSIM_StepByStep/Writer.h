@@ -10,6 +10,7 @@ public:
 	virtual void run();
 	void set_filename(std::string fname){ filename = fname; }
 	void add_line(std::string str){ writeContainer.push_back(str); }
+	void set_done(){ done_writing = true; }
 private:
 	std::mutex mtx;
 	void write_to_file(std::string str);
@@ -18,6 +19,7 @@ private:
 	std::string filename;
 	std::deque<std::string> writeContainer;
 	std::string name;
+	bool done_writing;
 	bool newRun;
 	Writer(std::string name);
 	~Writer();

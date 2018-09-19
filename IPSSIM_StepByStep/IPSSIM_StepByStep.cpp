@@ -10,11 +10,11 @@ void main(int argc, _TCHAR* argv[])
 {
 
 	std::thread simControl = std::thread(&SimulationControl::run, SimulationControl::instance());
-	std::thread writer = std::thread(&Writer::run, Writer::instance("LST"));
-	std::thread writer2 = std::thread(&Writer::run, Writer::instance("NOD"));
+	std::thread lstwriter = std::thread(&Writer::run, Writer::instance("LST"));
+	std::thread nodwriter = std::thread(&Writer::run, Writer::instance("NOD"));
 	simControl.join();
-	writer.join();
-	writer2.join();
+	lstwriter.join();
+	nodwriter.join();
 	std::cout << "Simulation Ended." << std::endl;
 }
 

@@ -2,6 +2,7 @@
 #include "InputFiles.h"
 #include "simulationControl.h"
 #include "Storage.h"
+#include "Writer.h"
 
 InputFiles* InputFiles::m_pInstance = nullptr;
 
@@ -123,33 +124,46 @@ void InputFiles::setFilesForWriting()
 
 void InputFiles::printAllFileInformation()
 {
-	SimulationControl::wConsole("List of Files for Reading..", 7);
+	SimulationControl::wConsole("List of Files for Reading..", 14);
 	
 	std::unordered_map<std::string, std::string>::iterator it = filesToRead.begin();
 	int i = 1;
 	while (it != filesToRead.end())
 	{
-		std::cout << "\t" << i << " -- " << it->second << std::endl;
+		char buff[1024];
+		_snprintf(buff, 1024, "\t %d", i);
+		SimulationControl::wConsolex(buff,13);
+		SimulationControl::wConsolex("\t -- \t", 15);
+		SimulationControl::wConsole(it->second.c_str(), 11);
+		//std::cout << "\t" << i << " -- " << it->second << std::endl;
 		it++;
 		i++;
 	}
 
-	SimulationControl::wConsole("List of Files for Writing..", 7);
+	SimulationControl::wConsoleSpacer();
+	SimulationControl::wConsole("List of Files for Writing..", 14);
 
 	i = 1;
 	it = filesToWrite.begin();
 	while (it != filesToWrite.end())
 	{
-		std::cout << "\t" << i << " -- " << it->second << std::endl;
+	//	std::cout << "\t" << i << " -- " << it->second << std::endl;
+		char buff[1024];
+		_snprintf(buff, 1024, "\t %d", i);
+		SimulationControl::wConsolex(buff, 13);
+		SimulationControl::wConsolex("\t -- \t", 15);
+		SimulationControl::wConsole(it->second.c_str(), 11);
 		it++;
 		i++;
 	}
+	SimulationControl::wConsoleSpacer();
 }
 
 
 //Check if all required input files exists in working Directory
 void InputFiles::checkInputFiles()
 {
+	SimulationControl::wConsole("Checking if input files exist...",14);
 	std::unordered_map<std::string, std::string>::iterator it = filesToRead.begin();
 	while (it != filesToRead.end()){
 		std::string str;
@@ -160,21 +174,54 @@ void InputFiles::checkInputFiles()
 		if (fin.fail())
 		{
 			
-			std::cout << "Failed: " << std::endl;
+			SimulationControl::wConsole("Failed: ",12);
+			SimulationControl::wConsolex("\t", 12);
+			SimulationControl::wConsole(str.c_str(), 15);
 			
-			std::cout << str << std::endl;
-			
-			std::cout << std::setw(80) << std::right << " file is not in the current working directory." << std::endl;
+			SimulationControl::wConsoleRight(" file is not in the current working directory.", 9);
+			//std::cout << std::setw(80) << std::right << " file is not in the current working directory." << std::endl;
 			SimulationControl::exitOnError();
 		}
-		
-		std::cout << "Success :" << std::endl;
-		
-		std::cout << str << std::endl;
-		
-		std::cout << std::setw(80) << std::right << " file is in the current working directory." << std::endl;
+
+		SimulationControl::wConsole("Success :", 10);
+		SimulationControl::wConsolex("\t", 12);
+		SimulationControl::wConsole(str.c_str(), 15);
+		SimulationControl::wConsoleRight(" file is in the current working directory.", 9);
 		it++;
 	}
+	SimulationControl::wConsoleSpacer();
+}
+
+void InputFiles::printInputFilesToLST()
+{
+	Writer * lstWriter = Writer::instance("LST");
+	std::string logLine;
+	logLine.append("\n\n\n\n\n           F I L E   U N I T   A S S I G N M E N T S\n\n");
+	logLine.append("             INPUT UNITS : ");
+	logLine.append("\n              INP FILE (MAIN INPUT)                     ASSIGNED TO ");
+	logLine.append(filesToRead["INP"]);
+	logLine.append("\n              ICS FILE (INITIAL CONDITIONS)             ASSIGNED TO ");
+	logLine.append(filesToRead["ICS"]);
+	logLine.append("\n              BCS FILE (TIME-VAR. BND. COND.)           ASSIGNED TO ");
+	logLine.append(filesToRead["BCS"]);
+	logLine.append("\n\n             OUTPUT UNITS : ");
+	logLine.append("\n              SMY FILE (RUN SUMMARY)                    ASSIGNED TO ");
+	logLine.append(filesToWrite["SMY"]);
+	logLine.append("\n              LST FILE (GENERAL OUTPUT)                 ASSIGNED TO ");
+	logLine.append(filesToWrite["LST"]);
+	logLine.append("\n              RST FILE (RESTART DATA)                   ASSIGNED TO ");
+	logLine.append(filesToWrite["RST"]);
+	logLine.append("\n              NOD FILE (NODEWISE OUTPUT)                ASSIGNED TO ");
+	logLine.append(filesToWrite["NOD"]);
+	logLine.append("\n              ELE FILE (VELOCITY OUTPUT)                ASSIGNED TO ");
+	logLine.append(filesToWrite["ELE"]);
+	logLine.append("\n              OBS FILE (OBSERVATION OUTPUT)             ASSIGNED TO ");
+	logLine.append(filesToWrite["OBS"]);
+	logLine.append("\n\n              NAMES FOR OBS AND OBC FILES WILL BE GENERATED AUTOMATICALLY FROM THE BASE NAMES LISTED ABOVE AND SCHEDULE NAMES");
+	logLine.append("\n              LISTED LATER IN THIS FILE.UNIT NUMBERS ASSIGNED TO THESE FILES WILL BE THE FIRST AVAILABLE NUMBERS GREATER THAN");
+	logLine.append("\n              OR EQUAL TO THE VALUES LISTED ABOVE IN PARENTHESES.");
+	lstWriter->add_line(logLine);
+
 }
 
 // Read props.inp file for layer information and simulation time step divide

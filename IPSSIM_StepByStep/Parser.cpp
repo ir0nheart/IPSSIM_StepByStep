@@ -55,7 +55,10 @@ void Parser::mapFile(std::string fileName)
 	std::string inpFile;
 	inpFile.append(input_directory);
 	inpFile.append(fileName);
-
+	char buff[1024];
+	SimulationControl::wConsolex("Mapping ", 14);
+	SimulationControl::wConsolex(fileName.c_str(), 11);
+	SimulationControl::wConsole(" for parsing. ", 14);
 	int ssize = inpFile.length();
 	TCHAR *param = new TCHAR[ssize + 1];
 	param[ssize] = 0;
@@ -89,7 +92,11 @@ void Parser::mapFile(std::string fileName)
 		0,
 		0,
 		0);
-	std::cout << "\t Successfully mapped " << fileName << " file." << std::endl;
+	SimulationControl::wConsolex("\t Success : ", 10);
+	SimulationControl::wConsolex(fileName.c_str(), 11);
+	SimulationControl::wConsole(" mapped to memory.",15);
+
+	
 }
 
 void Parser::findDataSetPositionsInMap()
@@ -1737,7 +1744,7 @@ void Parser::extractBCS()
 		} while (iNode != 0);
 
 
-		std::cout << "BCS extracted for Time Step : " << storage->get_bcs_container()[i]->getTimeStep() << std::endl;
+		//std::cout << "BCS extracted for Time Step : " << storage->get_bcs_container()[i]->getTimeStep() << std::endl;
 		i = i + 1;
 	}
 }
