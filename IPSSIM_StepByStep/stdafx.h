@@ -24,5 +24,13 @@
 #include <viennacl/compressed_matrix.hpp>
 #include <viennacl/linalg/gmres.hpp>
 #include <viennacl/linalg/ilu.hpp>
+#include <compcol_double.h>
+#include <ilupre_double.h>
+#include MATRIX_H
+#include "gmres.h"
+#include <ilupre_double.h>
 
+#pragma comment(lib,"C:/Code Libraries/SparseLib++/1.7/lib/libsparse.lib")
+#pragma comment(lib,"C:/Code Libraries/SparseLib++/1.7/lib/libspblas.lib")
+#pragma comment(lib,"C:/Code Libraries/SparseLib++/1.7/lib/libmv.lib")
 // TODO: reference additional headers your program requires here

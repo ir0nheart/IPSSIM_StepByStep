@@ -473,6 +473,7 @@ Storage::Storage()
 	INTIM = true;
 	ISTOP = 0;
 	KSOLVP = 1;
+	KSOLVU = 1;
 
 
 	GXLOC.assign({ -1, 1, 1, -1, -1, 1, 1, -1 });
@@ -1570,7 +1571,7 @@ void Storage::check_data_sets()
 		{
 			std::vector<double> rotMat;
 			ROTMAT(el_pangl1[j], el_pangl2[j], el_pangl3[j], rotMat);
-			TENSYM(el_pmax[j], el_pmid[j], el_pmin[j], rotMat, el_permxx[j], el_permxy[j], el_permxz[j], el_permyx[j], el_permyy[j], el_permyz[j], el_permzx[j], el_permzy[j], el_permzz[j]);
+			TENSYM(el_pmax[j], el_pmid[j], el_pmin[j], rotMat, &el_permxx[j], &el_permxy[j], &el_permxz[j], &el_permyx[j], &el_permyy[j], &el_permyz[j], &el_permzx[j], &el_permzy[j], &el_permzz[j]);
 		}
 		delete[] el_pmax;
 		delete[] el_pmid;
@@ -2008,29 +2009,77 @@ void Storage::ROTMAT(double& a1, double& a2, double& a3, std::vector<double>& ve
 
 }
 
-void Storage::TENSYM(double& pmax,double& pmid,double& pmin,std::vector<double>& rotMat,double& permxx,double& permxy,double &permxz,double& permyx,double&permyy,double& permyz,double& permzx,double& permzy,double& permzz)
+
+void Storage::ROTMAT(double * a1, double * a2, double * a3, double * vec)
 {
-	permxx = rotMat[0] * rotMat[0] * pmax +
+
+	double s1 = sin(*a1);
+	double s2 = sin(*a2);
+	double s3 = sin(*a3);
+	double c1 = cos(*a1);
+	double c2 = cos(*a2);
+	double c3 = cos(*a3);
+	vec[0] = c1*c2;
+	vec[1] = -1 * c1*s2*s3 - s1*c3;
+	vec[2] = -1 * c1*s2*c3 + s1*s3;
+	vec[3] = s1*c2;
+	vec[4] = -1 * s1*s2*s3 + c1*c3;
+	vec[5] = -1 * s1*s2*c3 - c1*s3;
+	vec[6] = s2;
+	vec[7] = c2*s3 - s1*c3;
+	vec[8] = c2*c3;
+
+}
+
+void Storage::TENSYM(double& pmax,double& pmid,double& pmin,std::vector<double>& rotMat,double* permxx,double* permxy,double *permxz,double* permyx,double*permyy,double* permyz,double* permzx,double* permzy,double* permzz)
+{
+	*permxx = rotMat[0] * rotMat[0] * pmax +
 		rotMat[1] * rotMat[1] * pmid +
 		rotMat[2] * rotMat[2] *pmin;
-	permxy = rotMat[0] * rotMat[3] * pmax +
+	*permxy = rotMat[0] * rotMat[3] * pmax +
 		rotMat[1] * rotMat[4] * pmid +
 		rotMat[2] * rotMat[5] * pmin;
-	permxz = rotMat[0] * rotMat[6] * pmax +
+	*permxz = rotMat[0] * rotMat[6] * pmax +
 		rotMat[1] * rotMat[7] * pmid +
 		rotMat[2] * rotMat[8] * pmin;
-	permyy = rotMat[3] * rotMat[3] * pmax +
+	*permyy = rotMat[3] * rotMat[3] * pmax +
 		rotMat[4] * rotMat[4] * pmid +
 		rotMat[5] * rotMat[5] * pmin;
-	permyz = rotMat[3] * rotMat[6] * pmax +
+	*permyz = rotMat[3] * rotMat[6] * pmax +
 		rotMat[4] * rotMat[7] * pmid +
 		rotMat[5] * rotMat[8] * pmin;
-	permzz = rotMat[6] * rotMat[6] * pmax +
+	*permzz = rotMat[6] * rotMat[6] * pmax +
 		rotMat[7] * rotMat[7] * pmid +
 		rotMat[8] * rotMat[8] * pmin;
-	permyx = permxy;
-	permzx = permxz;
-	permzy = permyz;
+	*permyx = *permxy;
+	*permzx = *permxz;
+	*permzy = *permyz;
+}
+
+
+void Storage::TENSYM(double * pmax, double * pmid, double * pmin, double * rotMat, double* permxx, double* permxy, double *permxz, double* permyx, double*permyy, double* permyz, double* permzx, double* permzy, double* permzz)
+{
+	*permxx = rotMat[0] * rotMat[0] * (*pmax) +
+		rotMat[1] * rotMat[1] * (*pmid) +
+		rotMat[2] * rotMat[2] * (*pmin);
+	*permxy = rotMat[0] * rotMat[3] * (*pmax) +
+		rotMat[1] * rotMat[4] * (*pmid) +
+		rotMat[2] * rotMat[5] * (*pmin);
+	*permxz = rotMat[0] * rotMat[6] * (*pmax) +
+		rotMat[1] * rotMat[7] * (*pmid) +
+		rotMat[2] * rotMat[8] * (*pmin);
+	*permyy = rotMat[3] * rotMat[3] * (*pmax) +
+		rotMat[4] * rotMat[4] * (*pmid) +
+		rotMat[5] * rotMat[5] * (*pmin);
+	*permyz = rotMat[3] * rotMat[6] * (*pmax) +
+		rotMat[4] * rotMat[7] * (*pmid) +
+		rotMat[5] * rotMat[8] * (*pmin);
+	*permzz = rotMat[6] * rotMat[6] * (*pmax) +
+		rotMat[7] * rotMat[7] * (*pmid) +
+		rotMat[8] * rotMat[8] * (*pmin);
+	*permyx = *permxy;
+	*permzx = *permxz;
+	*permzy = *permyz;
 }
 
 void Storage::determine_tmax()
@@ -2390,7 +2439,7 @@ BEGIN_ITERATION:
 		f_file = "u_vec";
 		f_file.append(std::to_string(IT));
 		f_file.append(".bin");
-		std::ofstream outuvecbin("C:/Users/demiryurek.a/Mishac/pvec_uvec/" + f_file, std::ios::binary);
+		std::ofstream outuvecbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
 		for (int i = 0; i < NN; i++)
 			outuvecbin.write(reinterpret_cast < const char*>(&node_u_rhs[0] + i), sizeof(double));
 		outuvecbin.close();
@@ -2398,7 +2447,7 @@ BEGIN_ITERATION:
 		f_file = "u_MAT";
 		f_file.append(std::to_string(IT));
 		f_file.append(".bin");
-		std::ofstream outumatbin("C:/Users/demiryurek.a/Mishac/pvec_uvec/" + f_file, std::ios::binary);
+		std::ofstream outumatbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
 		for (int i = 0; i < NELT; i++)
 			outumatbin.write(reinterpret_cast < const char*>(&UMAT[0] + i), sizeof(double));
 		outumatbin.close();
@@ -2406,7 +2455,7 @@ BEGIN_ITERATION:
 		f_file = "p_MAT";
 		f_file.append(std::to_string(IT));
 		f_file.append(".bin");
-		std::ofstream outpmatbin("C:/Users/demiryurek.a/Mishac/pvec_uvec/" + f_file, std::ios::binary);
+		std::ofstream outpmatbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
 		for (int i = 0; i < NELT; i++)
 			outpmatbin.write(reinterpret_cast < const char*>(&PMAT[0] + i), sizeof(double));
 		outpmatbin.close();
@@ -2461,10 +2510,40 @@ BEGIN_ITERATION:
 			std::cout << " P solution inferred from Matrix equation. No solver called." << std::endl;
 		} else
 		{
+			CompCol_Mat_double A;
+			A.newsize(NN, NN, NELT);
+			for (int i = 0; i < NELT; i++)
+			{
+				A.val(i) = PMAT[i];
+				A.row_ind(i) = IA[i];
+			}
+			for (int i = 0; i < NN + 1; i++)
+				A.col_ptr(i) = JA[i];
+
+			VECTOR_double b, x(A.dim(1), 0.0);
+			b.newsize(NN);
+			for (int i = 0; i < NN; i++)
+				b(i) = node_p_rhs[i];
+			int restart = 32, result, it = 2000;
+			MATRIX_double H(restart + 1, restart, 0.0);
+			CompCol_ILUPreconditioner_double M(A);
+			double tol = 1.e-13;
+
+			result = GMRES(A, x, b, M, H, restart, it, tol);
+
+			if (!result)
+				ONCEP = true;
+			for (int i = 0; i < NN; i++)
+				node_p_solution[i] = x(i);
+
+			std::cout << " GMRES flag " << result << std::endl;
+			std::cout << "iterations performed : " << it << std::endl;
+			std::cout << "tolerance achieved : " << tol << std::endl;
+			std::cout << "done " << std::endl;
 			// if but we will try gmres
 			// solve for p;
 			// convert to row compressed
-
+			/*
 			re_orient_matrix(NN + 1, NELT, PMAT, JA, IA, new_MAT, row_jumper, col_indices);
 			// set vienna cl rhs vector
 			viennacl::vector<double> vcl_rhs = viennacl::scalar_vector<double>(NN, 0.0);
@@ -2474,15 +2553,13 @@ BEGIN_ITERATION:
 			viennacl::compressed_matrix<double> A;
 			A.set(row_jumper, col_indices, new_MAT, NN, NN,NELT);
 
-			/**
-			* As initial guess we take a vector consisting of all 0.9s, except for the first entry, which we set to zero:
-			**/
+			//As initial guess we take a vector consisting of all 0.9s, except for the first entry, which we set to zero:
+			
 			viennacl::vector<double> init_guess = viennacl::scalar_vector<double>(A.size2(), double(0.9));
 			init_guess[0] = 0;
 
-			/**
-			* Set up the monitor data, holding the system matrix, the right hand side, and the initial guess:
-			**/
+			// Set up the monitor data, holding the system matrix, the right hand side, and the initial guess:
+		
 			monitor_user_data<viennacl::compressed_matrix<double>, viennacl::vector<double> > my_monitor_data(A, vcl_rhs, init_guess);
 
 
@@ -2507,7 +2584,7 @@ BEGIN_ITERATION:
 			for (int i = 0; i < NN; i++)
 				node_p_rhs[i] = vcl_results[i];
 			int ITRS = my_gmres_solver.tag().iters();
-			double ERR = my_gmres_solver.tag().error();
+			double ERR = my_gmres_solver.tag().error();*/
 		}
 
 		if (ISSFLO != 0)
@@ -2527,50 +2604,76 @@ BEGIN_ITERATION:
 				std::cout << " U Solution inferred from matrix equation" << std::endl;
 			} else
 			{
-				// Solve for U;
-				re_orient_matrix(NN + 1, NELT, UMAT, JA, IA, new_MAT, row_jumper, col_indices);
-				// set vienna cl rhs vector
-				viennacl::vector<double> vcl_rhs = viennacl::scalar_vector<double>(NN, 0.0);
-				for (int i = 0; i < NN; i++)
-					vcl_rhs[i] = node_u_rhs[i];
-				// Set Matrix;
-				viennacl::compressed_matrix<double> A;
-				A.set(row_jumper, col_indices, new_MAT, NN, NN,NELT);
-
-				/**
-				* As initial guess we take a vector consisting of all 0.9s, except for the first entry, which we set to zero:
-				**/
-				viennacl::vector<double> init_guess = viennacl::scalar_vector<double>(A.size2(), double(0.9));
-				init_guess[0] = 0;
-
-				/**
-				* Set up the monitor data, holding the system matrix, the right hand side, and the initial guess:
-				**/
-				monitor_user_data<viennacl::compressed_matrix<double>, viennacl::vector<double> > my_monitor_data(A, vcl_rhs, init_guess);
-
-
-				for (int i = 0; i < NN + 1; i++)
-				{
-					row_jumper[i] = 0;
-				}
+				CompCol_Mat_double A;
+				A.newsize(NN, NN, NELT);
 				for (int i = 0; i < NELT; i++)
 				{
-					col_indices[i] = 0;
-					new_MAT[i] = 0;
+					A.val(i) = UMAT[i];
+					A.row_ind(i) = IA[i];
 				}
-				// Preconditioner
-				viennacl::linalg::ilu0_tag my_tag;
-				viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0(A, my_tag);
-				viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 1600,40);
-				viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
-				my_gmres_solver.set_monitor(my_custom_monitor<viennacl::vector<double>, double, viennacl::compressed_matrix<double> >, &my_monitor_data);
-				my_gmres_solver.set_initial_guess(init_guess);
-				viennacl::vector<double> vcl_results(A.size2());
-				vcl_results = my_gmres_solver(A, vcl_rhs, ilu0);
+				for (int i = 0; i < NN + 1; i++)
+					A.col_ptr(i) = JA[i];
+
+				VECTOR_double b, x(A.dim(1), 0.0);
+				b.newsize(NN);
 				for (int i = 0; i < NN; i++)
-					node_u_rhs[i] = vcl_results[i];
-				int ITRS = my_gmres_solver.tag().iters();
-				double ERR = my_gmres_solver.tag().error();
+					b(i) = node_u_rhs[i];
+				int restart = 32,result,it=1600;
+				MATRIX_double H(restart + 1, restart, 0.0);
+				CompCol_ILUPreconditioner_double M(A);
+				double tol = 1.e-13;
+
+				result = GMRES(A, x, b, M, H, restart, it, tol);
+				
+				for (int i = 0; i < NN; i++)
+					node_u_solution[i] = x(i);
+
+				std::cout << " GMRES flag " << result << std::endl;
+				std::cout << "iterations performed : " << it << std::endl;
+				std::cout << "tolerance achieved : " << tol << std::endl;
+				std::cout << "done " << std::endl;
+				//// Solve for U;
+				//re_orient_matrix(NN + 1, NELT, UMAT, JA, IA, new_MAT, row_jumper, col_indices);
+				//// set vienna cl rhs vector
+				//viennacl::vector<double> vcl_rhs = viennacl::scalar_vector<double>(NN, 0.0);
+				//for (int i = 0; i < NN; i++)
+				//	vcl_rhs[i] = node_u_rhs[i];
+				//// Set Matrix;
+				//viennacl::compressed_matrix<double> A;
+				//A.set(row_jumper, col_indices, new_MAT, NN, NN,NELT);
+
+				////As initial guess we take a vector consisting of all 0.9s, except for the first entry, which we set to zero:
+				//
+				//viennacl::vector<double> init_guess = viennacl::scalar_vector<double>(A.size2(), double(0.9));
+				//init_guess[0] = 0;
+
+				//// Set up the monitor data, holding the system matrix, the right hand side, and the initial guess:
+				//
+				//monitor_user_data<viennacl::compressed_matrix<double>, viennacl::vector<double> > my_monitor_data(A, vcl_rhs, init_guess);
+
+
+				//for (int i = 0; i < NN + 1; i++)
+				//{
+				//	row_jumper[i] = 0;
+				//}
+				//for (int i = 0; i < NELT; i++)
+				//{
+				//	col_indices[i] = 0;
+				//	new_MAT[i] = 0;
+				//}
+				//// Preconditioner
+				//viennacl::linalg::ilu0_tag my_tag;
+				//viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0(A, my_tag);
+				//viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 1600,40);
+				//viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
+				//my_gmres_solver.set_monitor(my_custom_monitor<viennacl::vector<double>, double, viennacl::compressed_matrix<double> >, &my_monitor_data);
+				//my_gmres_solver.set_initial_guess(init_guess);
+				//viennacl::vector<double> vcl_results(A.size2());
+				//vcl_results = my_gmres_solver(A, vcl_rhs, ilu0);
+				//for (int i = 0; i < NN; i++)
+				//	node_u_rhs[i] = vcl_results[i];
+				//int ITRS = my_gmres_solver.tag().iters();
+				//double ERR = my_gmres_solver.tag().error();
 			}
 		}
 
@@ -3157,8 +3260,10 @@ void Storage::ELEMN3()
 				EXG[kg] = esrcg*vxg[kg];
 				EYG[kg] = esrcg*vyg[kg];
 				EZG[kg] = esrcg*vzg[kg];
-				DISPR3(vxg[kg], vyg[kg], vzg[kg], vgmag[kg], el_pangl1[l], el_pangl2[l], el_pangl3[l], el_almax[l], el_almid[l], el_almin[l],
-					el_atmax[l], el_atmid[l], el_atmin[l], dxxg, dxyg, dxzg, dyxg, dyyg, dyzg, dzxg, dzyg, dzzg);
+				//Timer t;
+				DISPR3(&vxg[kg], &vyg[kg], &vzg[kg], &vgmag[kg], &el_pangl1[l], &el_pangl2[l], &el_pangl3[l], &el_almax[l], &el_almid[l], &el_almin[l],
+					&el_atmax[l], &el_atmid[l], &el_atmin[l], &dxxg, &dxyg, &dxzg, &dyxg, &dyyg, &dyzg, &dzxg, &dzyg, &dzzg);
+				//std::cout << t << std::endl;
 			}
 			double ESE;
 			if (ME == 1)
@@ -3348,7 +3453,7 @@ void Storage::BC()
 
 				double gur = 0.0;
 				double gul = 0.0;
-				if (QPLITR[ip] < 1)
+				if (QPLITR[ip] > 0)
 				{
 					gul = -CW*QPLITR[ip];
 					gur = -gul*node_ubc[ip];
@@ -3356,6 +3461,30 @@ void Storage::BC()
 				if (NOUMAT != 1)
 					UMAT[IMID] = UMAT[IMID] - gul;
 				node_u_rhs[i] = node_u_rhs[i] + gur;
+			}
+		}
+
+		if (ML == 1)
+			return;
+
+		if (NUBC != 0)
+		{
+			for (int ip = 0; ip < NUBC; ip++)
+			{
+				int i = abs(IUBC[ip]);
+				i = i - 1;
+				if (KSOLVU == 0)
+					IMID = i;
+				else
+					IMID = JA[i];
+
+				if (NOUMAT != 1)
+				{
+					double GUINL = -GNUU1[ip];
+					UMAT[IMID] = UMAT[IMID] - GUINL;
+				}
+				double guinr = GNUU1[ip] * node_ubc[ip];
+				node_u_rhs[i] = node_u_rhs[i] + guinr;
 			}
 		}
 }
@@ -3686,55 +3815,96 @@ void Storage::BUBSAT(double& SWB,double& RELKB,double PRES,double CNUB,double & 
 	RELKT = RELKB*RELK;
 }
 
-void Storage::DISPR3(double vx,double vy,double vz,double vmag,double ang1,double ang2,double ang3,
-	double ALMAX,double ALMID,double ALMIN,double ATMAX,double ATMID,double ATMIN,
-	double& dxx,double & dxy,double& dxz, double & dyx, double & dyy, double & dyz,double& dzx, double & dzy, double & dzz)
+void Storage::DISPR3(double * vx,double * vy,double * vz,double * vmag,double * ang1,double * ang2,double * ang3,
+	double * ALMAX,double * ALMID,double * ALMIN,double * ATMAX,double * ATMID,double * ATMIN,
+	double* dxx,double * dxy,double* dxz, double * dyx, double * dyy, double * dyz,double* dzx, double * dzy, double * dzz)
 {
 	//VX,VY,VZ,VMAG,ANG1,ANG2,ANG3,ALMAX,ALMID,ALMIN,  DISPR3.........800
 	//  ATMAX, ATMID, ATMIN, DXX, DXY, DXZ, DYX, DYY, DYZ, DZX, DZY, DZZ
 	double toliso = 1e-7;
 	double tolvrt = 1e-7;
 	double tolcir = 9.999999e-1;
+	double dt1, dt2;
 	double unx, uny, unz, wnz, wny, wnx;
 	double untxx, untyy, untzz, wntxx, wntyy, wntzz;
-	double vnx = vx / vmag;
-	double vny = vy / vmag;
-	double vnz = vz / vmag;
-	std::vector<double> vnvec(3,0);
-	std::vector<double> unvec(3, 0);
-	std::vector<double> wnvec(3, 0);
-	std::vector<double> vec(9,0);
+	double vnx = *vx / *vmag;
+	double vny = *vy / *vmag;
+	double vnz = *vz / *vmag;
+	double vnvec[3] = { 0, 0, 0 };
+	double unvec[3] = { 0, 0, 0 };
+	double wnvec[3] = { 0, 0, 0 };
+	double vec[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	//std::vector<double> vnvec(3,0);
+	//std::vector<double> unvec(3, 0);
+	//std::vector<double> wnvec(3, 0);
+	//std::vector<double> vec(9,0);
 	bool liso = false;
 	bool tiso = false;
-	std::vector<double> AL({ALMAX,ALMID,ALMIN});
-	double almxvl = *std::max_element(AL.begin(), AL.end());
-	double almnvl = *std::min_element(AL.begin(), AL.end());
-
+	double AL[3] = { *ALMAX, *ALMID, *ALMIN };
+	//std::vector<double> AL({ALMAX,ALMID,ALMIN});
+	//double almxvl = *std::max_element(AL.begin(), AL.end());
+	double almxvl = AL[0];
+	double tmpal, tmpat;
+	for (int i = 1; i < 3; i++)
+	{
+		tmpal = AL[i];
+		if (tmpal > almxvl)
+			almxvl = tmpal;
+	}
+	//double almnvl = *std::min_element(AL.begin(), AL.end());
+	double almnvl = AL[0];
+	for (int i = 1; i < 3; i++)
+	{
+		tmpal = AL[i];
+		if (tmpal < almnvl)
+			almnvl = tmpal;
+	}
+	//std::vector<double> AT({ ATMAX, ATMID, ATMIN });
+	double AT[3] = { *ATMAX, *ATMID, *ATMIN };
+	//double atmxvl = *std::max_element(AT.begin(), AT.end());
+	double atmxvl = AT[0];
+	for (int i = 1; i < 3; i++)
+	{
+		tmpat = AT[i];
+		if (tmpat > atmxvl)
+			atmxvl = tmpat;
+	}
+	//double atmnvl = *std::min_element(AT.begin(), AT.end());
+	double atmnvl = AT[0];
+	for (int i = 1; i < 3; i++)
+	{
+		tmpat = AT[i];
+		if (tmpat < atmnvl)
+			atmnvl = tmpat;
+	}
+	double at1, at2;
+	double DL;
+	int J[3];
+	double VN[3];
+	double UN[3], WN[3];
+	//std::vector<double> rotmat;
 	if (almxvl == 0)
 		liso = true;
 	else
 		liso = ((almxvl - almnvl) / almxvl < toliso);
 
-	double DL;
+	
 	if (liso)
 	{
-		DL = ALMAX*vmag;
+		DL = *ALMAX* *vmag;
 	} else
 	{
 		
 		ROTMAT(ang1, ang2, ang3, vec);
-		ROTATE(vec, vnx, vny, vnz, vnvec);
+		ROTATE(&vec[0], &vnx, &vny, &vnz, &vnvec[0]);
 		vnx = vnvec[0];
 		vny = vnvec[1];
 		vnz = vnvec[2];
 
-		DL = vmag / (vnvec[0] * vnvec[0] / ALMAX + vnvec[1] * vnvec[1] / ALMID + vnvec[2] * vnvec[2] / ALMIN);
+		DL = *vmag / (vnvec[0] * vnvec[0] / *ALMAX + vnvec[1] * vnvec[1] / *ALMID + vnvec[2] * vnvec[2] / *ALMIN);
 	}
 
-	std::vector<double> AT({ATMAX,ATMID,ATMIN });
-	double atmxvl = *std::max_element(AT.begin(), AT.end());
-	double atmnvl = *std::min_element(AT.begin(), AT.end());
-	double at1, at2;
+
 	if (atmxvl == 0.0)
 		tiso = true;
 	else
@@ -3757,24 +3927,24 @@ void Storage::DISPR3(double vx,double vy,double vz,double vmag,double ang1,doubl
 			wny = vnz*unx;
 			wnz = termh;
 		}
-		at1 = ATMAX;
+		at1 = *ATMAX;
 		at2 = at1;
 	} else
 	{
 		if (liso)
 		{
-			ROTMAT(ang1, ang2, ang3, vec);
-			ROTATE(vec, vnx, vny, vnz, vnvec);
+			ROTMAT(ang1, ang2, ang3, &vec[0]);
+			ROTATE(&vec[0], &vnx, &vny, &vnz, &vnvec[0]);
 			vnx = vnvec[0];
 			vny = vnvec[1];
 			vnz = vnvec[2];
 		}
 
-		int J[3];
-		J[0] = std::distance(AT.begin(), std::max_element(AT.begin(), AT.end()));
-		J[2] = std::distance(AT.begin(), std::min_element(AT.begin(), AT.end()));
+	
+		J[0] = std::distance(AT, std::max_element(AT, AT+ sizeof(AT)/sizeof(double)));
+		J[2] = std::distance(AT, std::min_element(AT, AT + sizeof(AT) / sizeof(double)));
 		J[1] = 3 - J[0] - J[2];
-		double VN[3];
+		
 		VN[0] = vnvec[0];
 		VN[1] = vnvec[1];
 		VN[2] = vnvec[2];
@@ -3852,7 +4022,7 @@ void Storage::DISPR3(double vx,double vy,double vz,double vmag,double ang1,doubl
 			at2 = a2b2c2 / den2;
 		}
 
-		double UN[3],WN[3];
+		
 		UN[J[0]] = untxx;
 		UN[J[1]] = untyy;
 		UN[J[2]] = untzz;
@@ -3865,8 +4035,8 @@ void Storage::DISPR3(double vx,double vy,double vz,double vmag,double ang1,doubl
 		double wnxx = WN[0];
 		double wnyy = WN[1];
 		double wnzz = WN[2];
-		ROTATE(vec, unxx, unyy, unzz, unvec);
-		ROTATE(vec, wnxx, wnyy, wnzz, wnvec);
+		ROTATE(&vec[0], &unxx, &unyy, &unzz, &unvec[0]);
+		ROTATE(&vec[0], &wnxx, &wnyy, &wnzz, &wnvec[0]);
 		unx = unvec[0];
 		uny = unvec[1];
 		unz = unvec[2];
@@ -3874,12 +4044,12 @@ void Storage::DISPR3(double vx,double vy,double vz,double vmag,double ang1,doubl
 		wny = wnvec[1];
 		wnz = wnvec[2];
 	}
-	double dt1 = at1*vmag;
-	double dt2 = at2*vmag;
+	dt1 = at1* *vmag;
+	dt2 = at2* *vmag;
 
-
-	std::vector<double> rotmat({ vnx, unx, wnx, vny, uny, wny, vnz, unz, wnz });
-	TENSYM(DL, dt1, dt2,rotmat, dxx, dxy, dxz, dyx, dyy, dyz, dzx, dzy, dzz);
+	double rMat[9] = { vnx, unx, wnx, vny, uny, wny, vnz, unz, wnz };
+	//rotmat.assign({ vnx, unx, wnx, vny, uny, wny, vnz, unz, wnz });
+	TENSYM(&DL, &dt1, &dt2,&rMat[0], dxx, dxy, dxz, dyx, dyy, dyz, dzx, dzy, dzz);
 }
 
 void Storage::ROTATE(std::vector<double>& vec, double& v1, double& v2, double& v3, std::vector<double>& out_vec)
@@ -3887,6 +4057,13 @@ void Storage::ROTATE(std::vector<double>& vec, double& v1, double& v2, double& v
 	out_vec[0] = vec[0] * v1 + vec[1] * v2 + vec[2] * v3;
 	out_vec[1] = vec[3] * v1 + vec[4] * v2 + vec[5] * v3;
 	out_vec[2] = vec[6] * v1 + vec[7] * v2 + vec[8] * v3;
+}
+
+void Storage::ROTATE(double * vec, double * v1, double* v2, double* v3, double * out_vec)
+{
+	out_vec[0] = vec[0] * *v1 + vec[1] * *v2 + vec[2] * *v3;
+	out_vec[1] = vec[3] * *v1 + vec[4] * *v2 + vec[5] * *v3;
+	out_vec[2] = vec[6] * *v1 + vec[7] * *v2 + vec[8] * *v3;
 }
 
 void Storage::GLOCOL(int L, double vole[], double bflowe[8][8], double dflowe[], double btrane[8][8], double dtrane[8][8])
@@ -3926,7 +4103,7 @@ void Storage::GLOCOL(int L, double vole[], double bflowe[8][8], double dflowe[],
 			if (found)
 			{
 				if (m != -1)
-					PMAT[m] = PMAT[m] + bflowe[ie][je];
+					PMAT[m] = PMAT[m] + bflowe[je][ie];
 				else
 					SimulationControl::exitOnError(" m negative");
 			}
@@ -3970,7 +4147,7 @@ void Storage::GLOCOL(int L, double vole[], double bflowe[8][8], double dflowe[],
 				if (found)
 				{
 					if (m != -1)
-						UMAT[m] = UMAT[m] + dtrane[ie][je] + btrane[ie][je];
+						UMAT[m] = UMAT[m] + dtrane[je][ie] + btrane[je][ie];
 					else
 						SimulationControl::exitOnError(" m negative");
 				}

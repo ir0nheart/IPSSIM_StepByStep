@@ -15,9 +15,9 @@ public:
 	void BASIS3_Simple(int L, double XLOC, double YLOC, double ZLOC, double& DET, double CJ[]);
 
 	void BUBSAT(double& SWB, double& RELKB, double PRES, double CNUB, double & RELKT, double& SWT, double SW, double RELK);
-	void DISPR3(double vx, double vy, double vz, double vmag, double ang1, double ang2, double ang3,
-		double ALMAX, double ALMID, double ALMIN, double ATMAX, double ATMID, double ATMIN,
-		double& dxx, double & dxy, double& dxz, double & dyx, double & dyy, double & dyz, double& dzx, double & dzy, double & dzz);
+	void DISPR3(double * vx, double * vy, double * vz, double * vmag, double * ang1, double * ang2, double * ang3,
+		double * ALMAX, double * ALMID, double * ALMIN, double * ATMAX, double * ATMID, double * ATMIN,
+		double* dxx, double * dxy, double* dxz, double * dyx, double * dyy, double * dyz, double* dzx, double * dzy, double * dzz);
 	void GLOCOL(int L,double vole[],double bflowe[8][8],double dflowe[],double btrane[8][8],double dtrane[8][8]);
 	void BCTIME();
 	void BCSTEP();
@@ -236,7 +236,10 @@ public:
 	void allocate_node_arrays();
 	void de_allocate_node_arrays();
 	void ROTMAT(double& a1, double& a2, double& a3, std::vector<double>& vec);
-	void TENSYM(double& pmax, double& pmid, double& pmin, std::vector<double>& rotMat, double& permxx, double& permxy, double &permxz, double& permyx, double&permyy, double& permyz, double& permzx, double& permzy, double& permzz);
+	void ROTMAT(double * a1, double * a2, double * a3, double * vec);
+	void ROTATE(double * vec, double * v1, double* v2, double* v3, double * out_vec);
+	void TENSYM(double& pmax, double& pmid, double& pmin, std::vector<double>& rotMat, double* permxx, double* permxy, double *permxz, double* permyx, double*permyy, double* permyz, double* permzx, double* permzy, double* permzz);
+	void TENSYM(double * pmax, double * pmid, double * pmin, double * rotMat, double* permxx, double* permxy, double *permxz, double* permyx, double*permyy, double* permyz, double* permzx, double* permzy, double* permzz);
 	std::vector<Schedule *> get_schedule_list(){ return schedule_list; }
 	void add_bcs(Bcs * bcs){ bcsContainer.push_back(bcs); }
 	std::vector<Bcs *> get_bcs_container(){ return bcsContainer; }
@@ -318,6 +321,7 @@ private:
 	
 	
 	int KSOLVP;
+	int KSOLVU;
 	int ISTOP;
 	int ME; // -1 For Solute , + 1 for ENERGY
 	int IUNSAT;

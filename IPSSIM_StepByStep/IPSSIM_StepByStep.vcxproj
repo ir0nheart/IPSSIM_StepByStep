@@ -98,8 +98,9 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Code Libraries\ViennaCL-1.7.1\libviennacl\include;C:\Code Libraries\ViennaCL-1.7.1;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Code Libraries\SparseLib++\1.7\mv\include;C:\Code Libraries\SparseLib++\1.7\include;C:\Code Libraries\ViennaCL-1.7.1\libviennacl\include;C:\Code Libraries\ViennaCL-1.7.1;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <AdditionalOptions>/D "COMPLEX=std::complex&lt;double&gt;" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -147,6 +148,7 @@
     <ClInclude Include="Bcs.h" />
     <ClInclude Include="DataSet.h" />
     <ClInclude Include="Element.h" />
+    <ClInclude Include="gmres.h" />
     <ClInclude Include="InputFiles.h" />
     <ClInclude Include="Node.h" />
     <ClInclude Include="obsPoint.h" />
