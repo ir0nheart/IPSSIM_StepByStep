@@ -12,6 +12,9 @@ public:
 	void set_xsi(double val){ xsi = val; }
 	void set_eta(double val){ eta = val; }
 	void set_zet(double val){ zet = val; }
+	std::string get_obs_sch()const { return schedule; }
+	std::string get_name() const{ return name; }
+	std::string get_format() const{ return format; }
 	~obsPoint();
 private:
 	std::string name;

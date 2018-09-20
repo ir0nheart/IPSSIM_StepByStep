@@ -368,6 +368,10 @@ private:
 	int ML;
 	int NOUMAT;
 	int ITER;
+	int NCOLPR;
+	int LCOLPR;
+	int NCOLS5;
+	int LCOLS6;
 
 	double TSECM1;
 	double RELCHG;
@@ -560,6 +564,15 @@ private:
 	std::vector<double> GZLOC;
 	bool switch_set;
 	bool bcs_defined;
+
+	static std::string K5SYM[9];
+	static std::string K6SYM[7];
+	static std::string VARNK5[9];
+	static std::string VARNK6[7];
+	static std::string LCOL[7];
+	static int J6COL[7];
+	static std::string NCOL[9];
+	static int J5COL[9];
 	Storage();
 	~Storage();
 };

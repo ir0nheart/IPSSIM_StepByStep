@@ -8,6 +8,14 @@
 #include "InputFiles.h"
 #include "Writer.h"
 Storage * Storage::m_pInstance = nullptr;
+std::string Storage::K5SYM[] = { "N", "X", "Y", "Z", "P", "U", "S", "ES", "RU" };
+std::string Storage::K6SYM[] = { "E","X","Y","Z","VX","VY","VZ" };
+std::string Storage::VARNK5[] = { "NODE NUMBER", "X-COORDINATE", "Y-COORDINATE", "Z-COORDINATE", "PRESSURE", "CONCENTRATION", "SATURATION", "EFFECTIVE STRESS", "STRESS RATIO" };
+std::string Storage::VARNK6[] = { "ELEMENT NUMBER", "X-COORDINATE OF CENTROID", "Y-COORDINATE OF CENTROID", "Z-COORDINATE OF CENTROID", "X-VELOCITY", "Y-VELOCITY", "Z-VELOCITY" };
+int Storage::J6COL[] = {0,0,0,0,0,0,0};
+std::string Storage::LCOL[] = { "" };
+int Storage::J5COL[] = {0,0,0,0,0,0,0,0,0};
+std::string Storage::NCOL[] = { "" };
 
 template<typename MatrixT, typename VectorT>
 struct monitor_user_data
@@ -1549,7 +1557,9 @@ void Storage::check_data_sets()
 	logLine.append("\n\n\n\n           I T E R A T I O N   C O N T R O L   D A T A\n");
 	if (ITRMAX - 1 <= 0){
 		
-		logLine.append("\n\n NON-ITERATIVE SOLUTION\n");
+		logLine.append("\n\n");
+		logLine.append(std::string(11, ' '));
+		logLine.append("  NON-ITERATIVE SOLUTION\n");
 	} else
 	{
 		logLine.append("\n\n");
@@ -1560,6 +1570,36 @@ void Storage::check_data_sets()
 		_snprintf(buff, 1024, "%15.4e     ABSOLUTE CONVERGENCE CRITERION FOR TRANSPORT SOLUTION\n", RUMAX);
 		logLine.append(buff);
 
+	}
+	lstWriter->add_line(logLine);
+	logLine.clear();
+
+	logLine.append("\n\n\n\n           S O L V E R - R E L A T E D   P A R A M E T E R S\n\n");
+	if (std::string(p_solver_string.begin(),p_solver_string.end()) != "DIRECT"){
+		logLine.append(std::string(13, ' '));
+		logLine.append("SOLVER FOR P: ");
+		logLine.append(std::string(p_solver_string.begin(),p_solver_string.end()));
+		logLine.append("\n\n");
+		logLine.append(std::string(20, ' '));
+		_snprintf(buff, 1024, "%6d     MAXIMUM NUMBER OF MATRIX SOLVER ITERATIONS DURING P SOLUTION\n", max_p_iterations);
+		logLine.append(buff);
+		logLine.append(std::string(11, ' '));
+		_snprintf(buff, 1024, "%15.4e     CONVERGENCE TOLERANCE FOR MATRIX SOLVER ITERATIONS DURING P SOLUTION\n\n", p_tolerance);
+		logLine.append(buff);
+		logLine.append(std::string(13, ' '));
+		logLine.append("SOLVER FOR U: ");
+		logLine.append(std::string(u_solver_string.begin(), u_solver_string.end()));
+		logLine.append("\n\n");
+		logLine.append(std::string(20, ' '));
+		_snprintf(buff, 1024, "%6d     MAXIMUM NUMBER OF MATRIX SOLVER ITERATIONS DURING U SOLUTION\n", max_u_iterations);
+		logLine.append(buff);
+		logLine.append(std::string(11, ' '));
+		_snprintf(buff, 1024, "%15.4e     CONVERGENCE TOLERANCE FOR MATRIX SOLVER ITERATIONS DURING U SOLUTION\n", u_tolerance);
+		logLine.append(buff);
+	}
+	else
+	{
+		logLine.append("\n             SOLVER FOR P AND U : DIRECT");
 	}
 	lstWriter->add_line(logLine);
 	logLine.clear();
@@ -1660,57 +1700,173 @@ void Storage::check_data_sets()
 	BCSTR = std::vector<bool>(ITMAX + 1,true);
 	BCSFL = std::vector<bool>(ITMAX + 1, true);
 
-	if (simulation_output_controls[0][0] == 'Y')
+	logLine.append("\n\n\n\n           O U T P U T   C O N T R O L S   A N D   O P T I O N S\n\n             .LST FILE\n             ---------\n\n");
+	_snprintf(buff, 1024, "             %8d   PRINTED OUTPUT CYCLE (IN TIME STEPS)\n",get_node_output_every());
+	logLine.append(buff);
+
+	if (simulation_output_controls[0][0] == 'Y'){
 		KNODAL = +1;
-	else
+		logLine.append("\n            - PRINT NODE COORDINATES, THICKNESSES AND POROSITIES");
+	}
+	else{
 		KNODAL = 0;
+		logLine.append("\n            - CANCEL PRINT OF NODE COORDINATES, THICKNESSES AND POROSITIES");
+	}
 
-	if (simulation_output_controls[1][0] == 'Y')
+	if (simulation_output_controls[1][0] == 'Y'){
 		KELMNT = +1;
-	else
+		logLine.append("\n            - PRINT ELEMENT PERMEABILITIES AND DISPERSIVITIES");
+	}
+	else{
 		KELMNT = 0;
+		logLine.append("\n            - CANCEL PRINT OF ELEMENT PERMEABILITIES AND DISPERSIVITIES");
+	}
 
-	if (simulation_output_controls[2][0] == 'Y')
+	if (simulation_output_controls[2][0] == 'Y'){
 		KINCID = +1;
-	else
+		logLine.append("\n            - PRINT NODE INCIDENCES IN EACH ELEMENT\n");
+	}
+	else{
 		KINCID = 0;
+		logLine.append("\n            - CANCEL PRINT OF NODE INCIDENCES IN EACH ELEMENT\n");
+	}
 
-	if (simulation_output_controls[3][0] == 'Y')
+	if (simulation_output_controls[3][0] == 'Y'){
 		KPANDS = +1;
-	else
+		logLine.append("\n            - PRINT PRESSURES AND SATURATIONS AT NODES ON EACH TIME STEP WITH OUTPUT");
+	}
+	else{
 		KPANDS = 0;
+		logLine.append("\n            - CANCEL PRINT OF PRESSURES AND SATURATIONS");
+	}
 
-	if (simulation_output_controls[4][0] == 'Y')
+	if (simulation_output_controls[4][0] == 'Y'){
 		KVEL = +1;
-	else
+		logLine.append("\n            - CALCULATE AND PRINT VELOCITIES AT ELEMENT CENTROIDS ON EACH TIME STEP WITH OUTPUT");
+
+	}
+	else{
 		KVEL = 0;
+		logLine.append("\n            - CANCEL PRINT OF VELOCITIES");
+	}
 
-	if (simulation_output_controls[5][0] == 'Y')
+	if (simulation_output_controls[5][0] == 'Y'){
 		KCORT = +1;
-	else
+		logLine.append("\n            - PRINT CONCENTRATIONS AT NODES AT EACH TIME STEP WITH OUTPUT\n");
+	}
+	else{
 		KCORT = 0;
+		logLine.append("\n            - CANCEL PRINT OF CONCENTRATIONS\n");
+	}
 
-	if (simulation_output_controls[6][0] == 'Y')
+	if (simulation_output_controls[6][0] == 'Y'){
 		KBUDG = +1;
-	else
+		logLine.append("\n            - CALCULATE AND PRINT FLUID AND SOLUTE BUDGETS ON EACH TIME STEP WITH OUTPUT\n");
+	}
+	else{
 		KBUDG = 0;
+		logLine.append("\n            - CANCEL PRINT OF BUDGETS\n");
+	}
 
-	if (simulation_output_controls[7][0] == 'Y')
+	if (simulation_output_controls[7][0] == 'Y'){
 		KSCRN = +1;
-	else
+	}
+	else{
 		KSCRN = 0;
+	}
 
-	if (simulation_output_controls[8][0] == 'Y')
+	if (simulation_output_controls[8][0] == 'Y'){
 		KPAUSE = +1;
-	else
+	}
+	else{
 		KPAUSE = 0;
-
+	}
+	lstWriter->add_line(logLine);
+	logLine.clear();
 
 	// Set NODAL OUTPUT HEADERS
 	// !!TODO
 
+	//	node_output_headers  
+	//
+	NCOLS5 = node_output_headers.size() - 1;
+	LCOLS6 = element_output_headers.size() - 1;
+
+	logLine.append("\n\n            .NOD FILE\n             ---------\n\n");
+	_snprintf(buff, 1024, "%8d   PRINTED OUTPUT CYCLE (IN TIME STEPS)\n",node_output_every);
+
+	for (int i = 0; i < NCOLS5; i++)
+	{
+		bool found = false;
+		for (int j = 0; j < 9; j++)
+		{
+			if (std::string(node_output_headers[i].begin(),node_output_headers[i].end()) == K5SYM[j])
+			{
+				if (j == 0 && i != 0)
+				{
+					SimulationControl::exitOnError("INP-8B-1");
+				}
+				if (j == 4 && KTYPE[0] == 2)
+				{
+					SimulationControl::exitOnError("INP-8B-2");
+				}
+				J5COL[i] = j;
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+		SimulationControl::exitOnError("INP-8B-3");
+	}
+
+	for (int j = 0; j < NCOLS5; j++)
+	{
+		_snprintf(buff, 1024, "             COLUMN %1d :  ", j+1);
+		logLine.append(buff);
+		logLine.append(VARNK5[J5COL[j]]);
+		logLine.append("\n");
+	}
+
 	//Set ELE OUTPUT HEADERS
 	// !!TODO
+	logLine.append("\n\n            .ELE FILE\n             ---------\n\n");
+	_snprintf(buff, 1024, "%8d   PRINTED OUTPUT CYCLE (IN TIME STEPS)\n");
+
+	for (int i = 0; i < LCOLS6; i++)
+	{
+		bool found = false;
+		for (int j = 0; j < 7; j++)
+		{
+			if (std::string(element_output_headers[i].begin(), element_output_headers[i].end()) == K6SYM[j])
+			{
+				if (j == 0 && i != 0)
+				{
+					SimulationControl::exitOnError("INP-8C-1");
+				}
+				if (j == 4 && KTYPE[0] == 2)
+				{
+					SimulationControl::exitOnError("INP-8C-2");
+				}
+				J6COL[i] = j;
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+			SimulationControl::exitOnError("INP-8C-3");
+	}
+	for (int j = 0; j < LCOLS6; j++)
+	{
+		_snprintf(buff, 1024, "             COLUMN %1d :  ", j+1);
+		logLine.append(buff);
+		logLine.append(VARNK6[J6COL[j]]);
+		logLine.append("\n");
+	}
+
+
+	lstWriter->add_line(logLine);
+	logLine.clear();
+
 
 	NOBCYC = ITMAX + 1;
 	if (NOBSN - 1 == 0)
@@ -1734,7 +1890,79 @@ void Storage::check_data_sets()
 
 	// Check if Obs Schedule defined
 	//!! TODO
+	if (ISSTRA == 1){
+		logLine.append("\n\n          .OBS AND .OBC FILES \n             -------------------\n\n");
+		logLine.append(std::string(13, ' '));
+		logLine.append("UNIT ASSIGNED TO ");
+		logLine.append(InputFiles::instance()->getFilesForWriting()["OBS"]);
+		logLine.append("\n\n             NOTE: BECAUSE FLOW AND TRANSPORT ARE STEADY-STATE, USER-DEFINED SCHEDULES ARE NOT IN EFFECT.\n");
+		logLine.append("             STEADY-STATE OBSERVATIONS WILL BE WRITTEN TO THE APPROPRIATE OUTPUT FILES.");
+	}
+	else
+	{
+		logLine.append("\n\n          .OBS AND .OBC FILES \n             -------------------\n\n");
+		logLine.append(std::string(13, ' '));
+		logLine.append("SCHEDULE ");
+		logLine.append(obsContainer[0].get_obs_sch());
+		logLine.append(" , FORMAT OBS");
+		logLine.append(", ASSIGNED TO ");
+		logLine.append(InputFiles::instance()->getFilesForWriting()["OBS"]);
+		logLine.append("\n");
 
+	}
+
+	logLine.append("\n\n\n\n           O B S E R V A T I O N   P O I N T S\n");
+	if (KTYPE[0] == 3){
+		logLine.append("\n\n             NAME");
+		logLine.append(std::string(44, ' '));
+		logLine.append("COORDINATES");
+		logLine.append(std::string(43, ' '));
+		logLine.append("SCHEDULE");
+		logLine.append(std::string(4, ' '));
+		logLine.append("FORMAT\n");
+		logLine.append(std::string(13, ' '));
+		logLine.append("----");
+		logLine.append(std::string(44, ' '));
+		logLine.append("-----------");
+		logLine.append(std::string(43, ' '));
+		logLine.append("--------");
+		logLine.append(std::string(4, ' '));
+		logLine.append("------\n");
+	}
+
+	if (NOBCYC != -1)
+	{
+		
+	}
+	else
+	{
+		for (obsPoint obs : obsContainer)
+		{
+			_snprintf(buff,1024,"             %10s %s ( %+14.7e, %+14.7e, %+14.7e )   %s  %s\n",obs.get_name().c_str(),std::string(35,'.').c_str(),obs.get_x(),obs.get_y(),obs.get_z(),obs.get_obs_sch().c_str(),obs.get_format().c_str());
+			logLine.append(buff);
+		}
+	}
+
+	lstWriter->add_line(logLine);
+	logLine.clear();
+
+	logLine.append("             .BCOF, .BCOS, .BCOP, AND .BCOU FILES\n");
+	logLine.append("             ------------------------------------\n\n");
+	_snprintf(buff, 1024, "                %4d   PRINTED OUTPUT CYCLE FOR FLUID SOURCES/SINK NODES TO .BCOF FILE (IN TIME STEPS)\n", NBCFPR);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "                %4d   PRINTED OUTPUT CYCLE FOR SOLUTE SOURCES/SINK NODES TO .BCOS FILE (IN TIME STEPS)\n", NBCSPR);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "                %4d   PRINTED OUTPUT CYCLE FOR SPECIFIED PRESSURE NODES TO .BCOP FILE (IN TIME STEPS)\n", NBCPPR);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "                %4d   PRINTED OUTPUT CYCLE FOR SPECIFIED CONCENTRATION NODES TO .BCOU FILE (IN TIME STEPS)\n", NBCUPR);
+	logLine.append(buff);
+
+	if (CINACT == 'Y')
+		logLine.append("\n             - PRINT INACTIVE BOUNDARY CONDITIONS\n");
+	else
+		logLine.append("\n             - CANCEL PRINT OF INACTIVE BOUNDARY CONDITIONS\n");
+	lstWriter->add_line(logLine);
+	logLine.clear();
 	// ADSMOD check
 	// !!TODO
 	_999:
