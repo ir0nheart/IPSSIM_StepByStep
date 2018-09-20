@@ -99,8 +99,8 @@ public:
 	int get_nsch() const;
 	int get_npcyc() const;
 	int get_nucyc() const;
-	int get_rpmax() const;
-	int get_rumax() const;
+	double get_rpmax() const;
+	double get_rumax() const;
 	int get_itrmax() const;
 	int get_max_p_iterations() const;
 	double get_p_tolerance() const;
@@ -110,8 +110,8 @@ public:
 	void set_p_tolerance(double val){ p_tolerance = val; }
 	void set_max_u_iterations(int val){ max_u_iterations = val; }
 	void set_u_tolerance(double val){ u_tolerance = val; }
-	void set_rpmax(int rpmax){ RPMAX = rpmax; }
-	void set_rumax(int rumax){ RUMAX = rumax; }
+	void set_rpmax(double rpmax){ RPMAX = rpmax; }
+	void set_rumax(double rumax){ RUMAX = rumax; }
 	void set_itrmax(int itrmax){ ITRMAX = itrmax; }
 	void add_temporal_control(std::vector<char> str){ temporalControl.push_back(str); }
 	void set_p_solver_string(std::vector<char>str){ p_solver_string = str; }
@@ -309,7 +309,8 @@ private:
 	int NE, NSOP, NSOU, NPBC, NUBC, NOBS;
 	int NSCH, NPCYC, NUCYC;
 	int NN1, NN2, NN3;
-	int ITRMAX, RPMAX, RUMAX;
+	int ITRMAX;
+	double RPMAX, RUMAX;
 	int max_p_iterations;
 	int max_u_iterations;
 	int simulation_output_every;

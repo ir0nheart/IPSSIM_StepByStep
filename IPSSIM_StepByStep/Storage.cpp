@@ -205,12 +205,12 @@ int Storage::get_nucyc() const
 	return NUCYC;
 }
 
-int Storage::get_rpmax() const
+double Storage::get_rpmax() const
 {
 	return RPMAX;
 }
 
-int Storage::get_rumax() const
+double Storage::get_rumax() const
 {
 	return RUMAX;
 }
@@ -1304,6 +1304,35 @@ void Storage::check_data_sets()
 			{
 				schedule_list[i]->add_step_time(timeList[j], timeList[j]);
 			}
+			logLine.append("\n\n");
+			logLine.append(std::string(16, ' '));
+			logLine.append("SCHEDULE ");
+			logLine.append(schedule_list[i]->get_name());
+			logLine.append("   TIME LIST THAT INCLUDES THE FOLLOWING ");
+			logLine.append(CREFT);
+			logLine.append(" TIMES (SEC):\n");
+
+			int ctr = 1;
+			bool newline = true;
+			for (int j = 0; j < NTLIST; j++)
+			{
+				if (newline){
+					logLine.append(std::string(40, ' '));
+					newline = false;
+				}
+				_snprintf(buff, 1024, "%15.7f  ", schedule_list[i]->get_step_time()[j].second);
+				logLine.append(buff);
+				ctr++;
+				if (ctr == 8 || i==NTLIST-1)
+				{
+					logLine.append("\n");
+					newline = true;
+					ctr = 1;
+				}
+
+			}
+			lstWriter->add_line(logLine);
+			logLine.clear();
 
 		}
 		else if (schedule_list[i]->get_type() == "STEP LIST")
@@ -1322,7 +1351,33 @@ void Storage::check_data_sets()
 				step = std::stoi(strtok(NULL, " "));
 				schedule_list[i]->add_step_time(step, step);
 			}
-
+			logLine.append("\n\n");
+			logLine.append(std::string(16, ' '));
+			logLine.append("SCHEDULE ");
+			logLine.append(schedule_list[i]->get_name());
+			logLine.append("   STEP LIST THAT INCLUDES THE FOLLOWING TIME STEPS\n");
+			int ctr = 1;
+			bool newline = true;
+			for (int j = 0; j < NSLIST; j++)
+			{
+				if (newline){
+					logLine.append(std::string(40, ' '));
+					newline = false;
+				}
+				_snprintf(buff, 1024, "%8d  ", schedule_list[i]->get_step_time()[j].first);
+				logLine.append(buff);
+				ctr++;
+				if (ctr == 8 || i==NSLIST-1 )
+				{
+					logLine.append("\n");
+					newline = true;
+					ctr = 1;
+				}
+				
+			}
+			lstWriter->add_line(logLine);
+			logLine.clear();
+				
 
 
 		}
@@ -1458,12 +1513,56 @@ void Storage::check_data_sets()
 	_l846:
 	// Writes
 
+	logLine.append("\n\n");
+	logLine.append(std::string(16, ' '));
+	logLine.append("SCHEDULE STEPS_1&UP   IDENTICAL TO SCHEDULE 'TIME STEPS', EXCEPT THAT IT OMITS TIME STEP 0;\n");
+	logLine.append(std::string(41, ' '));
+	logLine.append("THIS SCHEDULE IS DEFINED AUTOMATICALLY BY IPSSIM\n");
+	logLine.append("\n\n");
+	logLine.append(std::string(16, ' '));
+	logLine.append("SCHEDULE STEP_0   CONSISTS ONLY TIME STEP 0;\n");
+	logLine.append(std::string(41, ' '));
+	logLine.append("THIS SCHEDULE IS DEFINED AUTOMATICALLY BY IPSSIM\n");
+	logLine.append("\n\n");
+	logLine.append(std::string(16, ' '));
+	logLine.append("SCHEDULE STEP_1   CONSISTS ONLY TIME STEP 1;\n");
+	logLine.append(std::string(41, ' '));
+	logLine.append("THIS SCHEDULE IS DEFINED AUTOMATICALLY BY IPSSIM\n");
 
+	logLine.append("\n\n");
+	logLine.append(std::string(13, ' '));
+	logLine.append("SOLUTION CYCLINC DATA:\n\n");
+	logLine.append(std::string(11, ' '));
+	_snprintf(buff, 1024, "%15d     FLOW SOLUTION CYCLE (IN TIME STEPS)\n", NPCYC);
+	logLine.append(buff);
+	logLine.append(std::string(11, ' '));
+	_snprintf(buff, 1024, "%15d     TRANSPORT SOLUTION CYCLE (IN TIME STEPS)\n\n", NUCYC);
+	logLine.append(buff);
+	logLine.append(std::string(16, ' '));
+	logLine.append("FLOW AND TRANSPORT SOLUTIONS ARE ALSO COMPUTED AUTOMATICALLY ON TIME STEPS ON WHICH FLOW-RELATED\n");
+	logLine.append(std::string(16, ' '));
+	logLine.append("AND TRANSPORT-RELATED BOUNDARY CONDITIONS, RESPECTIVELY, ARE SET IN (OPTIONAL) BCS FILES.\n");
+	lstWriter->add_line(logLine);
+	logLine.clear();
 
+	//print iteration and temporal
+	logLine.append("\n\n\n\n           I T E R A T I O N   C O N T R O L   D A T A\n");
+	if (ITRMAX - 1 <= 0){
+		
+		logLine.append("\n\n NON-ITERATIVE SOLUTION\n");
+	} else
+	{
+		logLine.append("\n\n");
+		_snprintf(buff, 1024, "%15d     MAXIMUM NUMBER OF ITERATIONS PER TIME STEP\n", ITRMAX);
+		logLine.append(buff);
+		_snprintf(buff, 1024, "%15.4e     ABSOLUTE CONVERGENCE CRITERION FOR FLOW SOLUTION\n", RPMAX);
+		logLine.append(buff);
+		_snprintf(buff, 1024, "%15.4e     ABSOLUTE CONVERGENCE CRITERION FOR TRANSPORT SOLUTION\n", RUMAX);
+		logLine.append(buff);
 
-
-
-
+	}
+	lstWriter->add_line(logLine);
+	logLine.clear();
 
 	if (ISSFLO == 1)
 	{
