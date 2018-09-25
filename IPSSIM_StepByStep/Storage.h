@@ -372,6 +372,10 @@ private:
 	int LCOLPR;
 	int NCOLS5;
 	int LCOLS6;
+	int NROLD;
+	int NRTEST;
+	int LRTEST;
+	int LROLD;
 
 	double TSECM1;
 	double RELCHG;

@@ -1643,7 +1643,7 @@ void Storage::check_data_sets()
 	nodeContainer.reserve(NN);
 	allocate_node_arrays();
 	if (KTYPE[0] == 3){
-		
+		NRTEST = 1;
 		for (int j = 0; j < nodeData.size();j++)
 		{
 			
@@ -1653,6 +1653,9 @@ void Storage::check_data_sets()
 			node_y[j] = std::stod(strtok(NULL, " "));
 			node_z[j] = std::stod(strtok(NULL, " "));
 			node_por[j] = std::stod(strtok(NULL, " "));
+			if (node_nreg[j] != NROLD)
+				NRTEST++;
+			NROLD = node_nreg[j];
 		}
 	} else
 	{
@@ -1981,15 +1984,134 @@ void Storage::check_data_sets()
 		PRODS1 = 0.0;
 	}
 
-	/*for (int j = 0; j < nodeContainer.size();j++)
-	{
-		nodeContainer[j].set_sop(COMPMA, COMPFL);
-		nodeContainer[j].set_qin(0.0);
-		nodeContainer[j].set_uin(0.0);
-		nodeContainer[j].set_quin(0.0);
-		nodeContainer[j].reserve_neighbors(N48*(N48-1));
-	}*/
 
+	logLine.append("\n\n\n\n           C O N S T A N T   P R O P E R T I E S   O F   F L U I D   A N D   S O L I D   M A T R I X\n\n");
+	_snprintf(buff, 1024, "           %+15.4e     COMPRESSIBILITY OF FLUID\n",COMPFL);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "           %+15.4e     COMPRESSIBILITY OF POROUS MATRIX\n\n",COMPMA);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "           %+15.4e     FLUID VISCOSITY\n\n",VISC0);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "           %+15.4e     DENSITY OF A SOLID GRAIN\n\n",RHOS);
+	logLine.append(buff);
+
+	logLine.append("            FLUID DENSITY, RHOW\n");
+	logLine.append("            CALCULATED BY IPSSIM IN TERMS OF SOLUTE CONCENTRATION,U , AS:\n");
+	logLine.append("            RHOW = RHOW0 + DRWDU*(U-URHOW0)\n\n");
+
+	_snprintf(buff, 1024, "           %+15.4e     FLUID BASE DENSITY, RHOW0\n",RHOW0);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "           %+15.4e     COEFFICIENT OF DENSITY CHANGE WITH SOLUTE CONCENTRATION, DRWDU\n",DRWDU);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "           %+15.4e     SOLUTE CONCENTRATION, URHOW0, AT WHICH FLUID DENSITY IS AT BASE VALUE, RHOW0\n\n",URHOW0);
+	logLine.append(buff);
+
+	_snprintf(buff, 1024, "           %+15.4e     MOLECULAR DIFFUSIVITY OF SOLUTE IN FLUID\n",SIGMAW);
+	logLine.append(buff);
+	lstWriter->add_line(logLine);
+	logLine.clear();
+
+	std::string ads = std::string(adsorption_string.begin(),adsorption_string.end());
+	if (ads == "NONE")
+	{
+		logLine.append("\n\n\n\n           A D S O R P T I O N   P A R A M E T E R S\n\n");
+		logLine.append("                NON-SORBING SOLUTE\n");
+		lstWriter->add_line(logLine);
+		logLine.clear();
+	}
+
+	logLine.append("\n\n\n\n            P R O D U C T I O N   A N D   D E C A Y   O F   S P E C I E S   M A S S\n\n");
+	logLine.append("             PRODUCTION RATE (+)\n");
+	logLine.append("             DECAY RATE (-)\n");
+	_snprintf(buff, 1024, "           %+15.4e     ZERO-ORDER RATE OF SOLUTE MASS PRODUCTION/DECAY IN FLUID\n", PRODF0);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "           %+15.4e     ZERO-ORDER RATE OF ADSORBATE MASS PRODUCTION/DECAY IN IMMOBILE PHASE\n", PRODS0);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "           %+15.4e     FIRST-ORDER RATE OF SOLUTE MASS PRODUCTION/DECAY IN FLUID\n", PRODF1);
+	logLine.append(buff);
+	_snprintf(buff, 1024, "           %+15.4e     FIRST-ORDER RATE OF ADSORBATE MASS PRODUCTION/DECAY IN IMMOBILE PHASE\n", PRODS1);
+	logLine.append(buff);
+	lstWriter->add_line(logLine);
+	logLine.clear();
+
+	if (KTYPE[0] == 3)
+	{
+		logLine.append("\n\n\n\n           C O O R D I N A T E   O R I E N T A T I O N   T O   G R A V I T Y\n\n");
+		logLine.append("             COMPONENT OF GRAVITY VECTOR\n");
+		logLine.append("             IN +X DIRECTION, GRAVX\n");
+		_snprintf(buff, 1024, "           %+15.4e     GRAVX = -GRAV * D(ELEVATION)/DX\n\n", GRAVX);
+		logLine.append(buff);
+		logLine.append("             COMPONENT OF GRAVITY VECTOR\n");
+		logLine.append("             IN +Y DIRECTION, GRAVY\n");
+		_snprintf(buff, 1024, "           %+15.4e     GRAVY = -GRAV * D(ELEVATION)/DY\n\n", GRAVY);
+		logLine.append(buff);
+		logLine.append("             COMPONENT OF GRAVITY VECTOR\n");
+		logLine.append("             IN +Z DIRECTION, GRAVZ\n");
+		_snprintf(buff, 1024, "           %+15.4e     GRAVZ = -GRAV * D(ELEVATION)/DZ\n\n", GRAVZ);
+		logLine.append(buff);
+		lstWriter->add_line(logLine);
+		logLine.clear();
+
+		// print node information
+
+		if (KNODAL == 0)
+		{
+			logLine.append("\n\n\n\n          N O D E   I N F O R M A T I O N\n\n");
+			logLine.append("                PRINTOUT OF NODE COORDINATES, THICKNESSES AND POROSITIES CANCELLED.\n\n");
+			logLine.append("                SCALE FACTORS :\n");
+			logLine.append(std::string(33, ' '));
+			_snprintf(buff, 1024, "%+15.4e     X-SCALE\n", SCALX);
+			logLine.append(buff);
+			logLine.append(std::string(33, ' '));
+			_snprintf(buff, 1024, "%+15.4e     Y-SCALE\n", SCALY);
+			logLine.append(buff);
+			logLine.append(std::string(33, ' '));
+			_snprintf(buff, 1024, "%+15.4e     Z-SCALE\n", SCALZ);
+			logLine.append(buff);
+			logLine.append(std::string(33, ' '));
+			_snprintf(buff, 1024, "%+15.4e     POROSITY FACTOR\n", PORFAC);
+			logLine.append(buff);
+			lstWriter->add_line(logLine);
+			logLine.clear();
+		} else if (IUNSAT == 1 && KNODAL == 0 && NRTEST != 1)
+		{
+			logLine.append(std::string(33, ' '));
+			logLine.append("MORE THAN ONE REGION OF UNSATURATED PROPERTIES HAS BEEN SPECIFIED AMONG THE NODES\n");
+			lstWriter->add_line(logLine);
+			logLine.clear();
+			
+		} else if (IUNSAT == 1 && KNODAL == 0 && NRTEST == 1)
+		{
+			logLine.append(std::string(33, ' '));
+			logLine.append("ONLY ONE REGION OF UNSATURATED PROPERTIES HAS BEEN SPECIFIED AMONG THE NODES\n");
+			lstWriter->add_line(logLine);
+			logLine.clear();
+		} else if (IUNSAT != 1 && KNODAL == 1)
+		{
+			logLine.append("\n\n           N O D E   I N F O R M A T I O N\n\n");
+			logLine.append("           NODE       X                Y                 THICKNESS      POROSITY\n\n");
+			for (int i = 0; i < NN; i++)
+			{
+				_snprintf(buff, 1024, "         %9d   %+14.5e   %+14.5e   %+14.5e      %8.5f\n", i + 1, node_x[i], node_y[i], node_z[i], node_por[i]);
+			}
+			lstWriter->add_line(logLine);
+			logLine.clear();
+		} else if (IUNSAT == 1 && KNODAL == 1)
+		{
+			logLine.append("\n\n           N O D E   I N F O R M A T I O N\n\n");
+			logLine.append("           NODE   REGION       X                Y                 THICKNESS      POROSITY\n\n");
+			for (int i = 0; i < NN; i++)
+			{
+				_snprintf(buff, 1024, "         %9d   %6d   %+14.5e   %+14.5e   %+14.5e      %8.5f\n", i + 1,node_nreg[i], node_x[i], node_y[i], node_z[i], node_por[i]);
+			}
+			lstWriter->add_line(logLine);
+			logLine.clear();
+		}
+	} else
+	{
+		
+	}
+	
 	if (KTYPE[0] == 3)
 	{
 		PMAXFA = std::stod(std::string(element_props[1].begin(), element_props[1].end()));
@@ -2017,6 +2139,7 @@ void Storage::check_data_sets()
 		/*int el_num;
 		int lreg;
 		double pmax, pmid, pmin, ang1, ang2, ang3, almax, almid, almin, atmax, atmin, atmid;*/
+		
 		for (int j = 0; j < elementData.size();j++)
 		{
 			//str.push_back('\0');
@@ -2047,7 +2170,8 @@ void Storage::check_data_sets()
 			el_almin[j] = std::stod(strtok(NULL, " "));
 			el_atmax[j] = std::stod(strtok(NULL, " "));
 			el_atmid[j] = std::stod(strtok(NULL, " "));
-			el_atmin[j] = std::stod(strtok(NULL, " "));			
+			el_atmin[j] = std::stod(strtok(NULL, " "));
+		
 		//	elementContainer.push_back(Element(&el_num[j],&el_lreg[j],&el_pmax[j],&el_pmid[j],&el_pmin[j],&el_ang1[j],&el_ang2[j],&el_ang3[j],&el_almax[j],&el_almid[j],&el_almin[j],&el_atmax[j],&el_atmid[j],&el_atmin[j]));
 		}
 	}
@@ -2110,12 +2234,118 @@ void Storage::check_data_sets()
 
 	std::cout << t << " seconds" << std::endl;
 
+	// Element Information
+
+	if (KTYPE[0] == 3)
+	{
+		if (KELMNT)
+		{
+			if (IUNSAT)
+			{
+				logLine.append("\n\n           E L E M E N T   I N F O R M A T I O N\n\n");
+				logLine.append("           ELEMENT   REGION    MAXIMUM         MIDDLE          MINIMUM                  ANGLE1         ANGLE2         ANGLE3    LONGITUDINAL   LONGITUDINAL   LONGITUDINAL     TRANSVERSE     TRANSVERSE     TRANSVERSE\n");
+				logLine.append("                               PERMEABILITY    PERMEABILITY    PERMEABILITY       (IN DEGREES)    (IN DEGREES)  (IN DEGREES)    DISPERSIVITY   DISPERSIVITY   DISPERSIVITY   DISPERSIVITY   DISPERSIVITY   DISPERSIVITY\n");
+				logLine.append("					      																									  IN MAX-PERM    IN-MID PERM    IN MIN-PERM     IN MAX-PERM    IN-MID PERM    IN MIN-PERM\n");
+				logLine.append("                                                                               (IN DEGREES)   DIRECTION      DIRECTION         DIRECTION      DIRECTION\n");
+				for (int i = 0; i < NE; i++)
+				{
+					_snprintf(buff, 1024, "        %9d    %5d  %+14.5e  %+14.5e  %+14.5e       %+11.4e    %+11.4e    %+11.4e    %+11.4e    %+11.4e    %+11.4e    %+11.4e    %+11.4e    %+11.4e\n", i + 1,el_lreg[i], el_pmax[i], el_pmid[i], el_pmin[i], el_ang1[i],
+						el_ang2[i], el_ang3[i], el_almax[i], el_almid[i], el_almin[i], el_atmax[i], el_atmid[i], el_atmin[i]);
+					logLine.append(buff);
+				}
+			} else
+			{
+				logLine.append("\n\n           E L E M E N T   I N F O R M A T I O N\n\n");
+				logLine.append("           ELEMENT       MAXIMUM         MIDDLE          MINIMUM                  ANGLE1         ANGLE2         ANGLE3    LONGITUDINAL   LONGITUDINAL   LONGITUDINAL     TRANSVERSE     TRANSVERSE     TRANSVERSE\n");
+				logLine.append("                         PERMEABILITY    PERMEABILITY    PERMEABILITY       (IN DEGREES)    (IN DEGREES)  (IN DEGREES)    DISPERSIVITY   DISPERSIVITY   DISPERSIVITY   DISPERSIVITY   DISPERSIVITY   DISPERSIVITY\n");
+				logLine.append("																														  IN MAX-PERM    IN-MID PERM    IN MIN-PERM     IN MAX-PERM    IN-MID PERM    IN MIN-PERM\n");
+				logLine.append("                                                                                                                          DIRECTION      DIRECTION      DIRECTION         DIRECTION      DIRECTION      DIRECTION\n");
+				for (int i = 0; i < NE; i++)
+				{
+					_snprintf(buff, 1024, "        %9d  %+14.5e  %+14.5e  %+14.5e       %+11.4e    %+11.4e    %+11.4e    %+11.4e    %+11.4e    %+11.4e    %+11.4e    %+11.4e    %+11.4e\n", i + 1, el_pmax[i], el_pmid[i], el_pmin[i], el_ang1[i],
+						el_ang2[i], el_ang3[i], el_almax[i], el_almid[i], el_almin[i], el_atmax[i], el_atmid[i], el_atmin[i]);
+					logLine.append(buff);
+				}
+				lstWriter->add_line(logLine);
+				logLine.clear();
+			}
+		} else
+		{
+			if (!IUNSAT){
+				logLine.append("\n\n\n\n           E L E M E N T   I N F O R M A T I O N\n\n");
+				logLine.append("               PRINTOUT OF ELEMENT PERMEABILITIES AND DISPERSIVITIES CANCELLED.\n\n");
+				logLine.append("               SCALE FACTORS : \n");
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      MAXIMUM PERMEABILITY FACTOR\n", PMAXFA);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      MIDDLE PERMEABILITY FACTOR\n", PMIDFA);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      MINIMUM PERMEABILITY FACTOR\n", PMINFA);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      ANGLE1 FACTOR\n", ANG1FA);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      ANGLE2 FACTOR\n", ANG2FA);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      ANGLE3 FACTOR\n", ANG3FA);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      FACTOR FOR LONGITUDINAL DISPERSIVITY IN MAX-PERM DIRECTION\n", ALMAXF);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      FACTOR FOR LONGITUDINAL DISPERSIVITY IN MID-PERM DIRECTION\n", ALMIDF);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      FACTOR FOR LONGITUDINAL DISPERSIVITY IN MIN-PERM DIRECTION\n", ALMINF);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      FACTOR FOR TRANSVERSE DISPERSIVITY IN MAX-PERM DIRECTION\n", ATMXF);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      FACTOR FOR TRANSVERSE DISPERSIVITY IN MID-PERM DIRECTION\n", ATMDF);
+				logLine.append(buff);
+				logLine.append(std::string(33, ' '));
+				_snprintf(buff, 1024, "%+15.4e      FACTOR FOR TRANSVERSE DISPERSIVITY IN MIN-PERM DIRECTION\n", ATMNF);
+				logLine.append(buff);
+				lstWriter->add_line(logLine);
+				logLine.clear();
+			}
+			else{
+				if (LRTEST != 1)
+				{
+					logLine.append("                                 MORE THAN ONE REGION OF UNSATURATED PROPERTIES HAS BEEN SPECIFIED AMONG THE ELEMENTS.\n");
+					lstWriter->add_line(logLine);
+					logLine.clear();
+				}
+				else
+				{
+					logLine.append("                                ONLY ONE REGION OF UNSATURATED PROPERTIES HAS BEEN SPECIFIED AMONG THE ELEMENTS.\n");
+					lstWriter->add_line(logLine);
+					logLine.clear();
+				}
+			}
+		}
+	} else
+	{
+		
+	}
+
 	NSOPI = NSOP - 1;
 	NSOUI = NSOU - 1;
 	IQSOPT = 1;
 	IQSOUT = 1;
 	if (NSOPI != 0)
 	{
+		logLine.append("\n\n\n\n           F L U I D   S O U R C E   D A T A\n\n\n\n");
+		logLine.append("           **** NODES AT WHICH FLUID INFLOWS OR OUTFLOWS ARE SPECIFIED ****\n\n");
+		logLine.append("                             DEFAULT FLUID    DEFAULT CONCENTRATION\n");
+		logLine.append("                       INFLOW(+)/OUTFLOW(-)      OF INFLOWING FLUID\n");
+		logLine.append("            NODE       (FLUID MASS/SECOND)  (MASS SOLUTE/MASS WATER)\n\n");
+
 		int IQCP, IQCPA;
 		double qinc, uinc;
 		for (int j = 0; j < nsopData.size() - 1; j++)
@@ -2130,12 +2360,20 @@ void Storage::check_data_sets()
 			if (IQCP >0)
 			{
 				qinc = std::stod(strtok(NULL, " "));
-				if (qinc > 0)
+				if (qinc > 0){
 					uinc = std::stod(strtok(NULL, " "));
-				else
+					_snprintf(buff, 1024, "       %9d      %+20.13e      %+20.13e\n", IQCP,qinc,uinc);
+					logLine.append(buff);
+				}
+				else{
 					uinc = 0.0;
+					_snprintf(buff, 1024, "       %9d      %+20.13e\n", IQCP, qinc);
+					logLine.append(buff);
+				}
 			} else
 			{
+				_snprintf(buff, 1024, "       %9d\n", IQCP);
+				logLine.append(buff);
 				qinc = 0.0;
 				uinc = 0.0;
 			}
@@ -2145,11 +2383,30 @@ void Storage::check_data_sets()
 			node_qin[IQCPA - 1]=qinc;
 			node_uin[IQCPA - 1]=uinc;
 		}
+		if (IQSOPT != -1)
+		{
+			logLine.append("\n           SPECIFICATIONS MADE IN (OPTIONAL) BCS INPUT FILES TAKE PRECEDENCE OVER THE");
+			logLine.append("\n           DEFAULT VALUES LISTED ABOVE AND ANY VALUES SET IN FUNCTION BCTIME.\n");
+		} else
+		{
+			logLine.append("\n\n            TIME-DEPENDENT FLUID SOURCE/SINK OR INFLOW CONCENTRATION");
+			logLine.append("\n            SET IN FUNCTION BCTIME IS INDICATED BY NEGATIVE NODE NUMBER\n");
+			logLine.append("\n           SPECIFICATIONS MADE IN (OPTIONAL) BCS INPUT FILES TAKE PRECEDENCE OVER THE");
+			logLine.append("\n           DEFAULT VALUES LISTED ABOVE AND ANY VALUES SET IN FUNCTION BCTIME.\n");
+		
+		}
 
+			lstWriter->add_line(logLine);
+			logLine.clear();
 	}
 
 	if (NSOUI != 0)
 	{
+		logLine.append("\n\n\n\n\n\n\n\n           S O L U T E   S O U R C E   D A T A\n\n\n\n");
+		logLine.append("\n\n\n\n           **** NODES AT WHICH SOURCES OR SINKS OF SOLUTE MASS ARE SPECIFIED ****\n\n");
+		logLine.append("                            DEFAULT SOLUTE\n");
+		logLine.append("                         SOURCE(+)/SINK(-)\n");
+		logLine.append("            NODE      (SOLUTE MASS/SECOND)\n\n");
 		int IQCU, IQCUA;
 		double quinc;
 		for (int j = 0; j < nsouData.size() - 1; j++)
@@ -2162,8 +2419,12 @@ void Storage::check_data_sets()
 			if (IQCU > 0)
 			{
 				quinc = std::stod(strtok(NULL, " "));
+				_snprintf(buff, 1024, "       %9d      %+20.13e\n", IQCU, quinc);
+				logLine.append(buff);
 			} else
 			{
+				_snprintf(buff, 1024, "       %9d\n", IQCU);
+				logLine.append(buff);
 				quinc = 0;
 			}
 			IQSOU.push_back(IQCU);
@@ -2172,6 +2433,20 @@ void Storage::check_data_sets()
 
 			node_quin[IQCUA - 1]=quinc;
 		}
+
+		if (IQSOPT != -1)
+		{
+			logLine.append("\n          SPECIFICATIONS MADE IN (OPTIONAL) BCS INPUT FILES TAKE PRECEDENCE OVER THE");
+			logLine.append("\n          DEFAULT VALUES LISTED ABOVE AND ANY VALUES SET IN FUNCTION BCTIME.\n");
+		} else
+		{
+			logLine.append("\n\n            TIME-DEPENDENT SOLUTE SOURCE/SINK SET IN\n");
+			logLine.append("            FUNCTION BCTIME IS INDICATED BY NEGATIVE NODE NUMBER.\n");
+			logLine.append("\n          SPECIFICATIONS MADE IN (OPTIONAL) BCS INPUT FILES TAKE PRECEDENCE OVER THE");
+			logLine.append("\n          DEFAULT VALUES LISTED ABOVE AND ANY VALUES SET IN FUNCTION BCTIME.\n");
+		}
+		lstWriter->add_line(logLine);
+		logLine.clear();
 	}
 
 	if (NBCN - 1 >0)
@@ -2180,6 +2455,12 @@ void Storage::check_data_sets()
 		IUBCT = 1;
 		if (NPBC != 0)
 		{
+			logLine.append("\n\n\n\n           S P E C I F I E D   P R E S S U R E   D A T A\n\n\n\n");
+			logLine.append("           **** NODES AT WHICH PRESSURES ARE SPECIFIED ****\n");
+			logLine.append("                (AS WELL AS SOLUTE CONCENTRATION OF ANY\n");
+			logLine.append("                FLUID INFLOW WHICH MAY OCCUR AT THE POINT\n");
+			logLine.append("                OF SPECIFIED PRESSURE)\n\n");
+			logLine.append("            NODE      DEFAULT PRESSURE     DEFAULT CONCENTRATION\n\n");
 			int IDUM, IDUMA;
 			double pbc_, ubc_;
 			GNUP1 = std::vector<double>(npbcData.size(), 0);
@@ -2196,18 +2477,38 @@ void Storage::check_data_sets()
 					ubc_ = std::stod(strtok(NULL, " "));
 					node_pbc[IDUMA - 1]=pbc_;
 					node_ubc[IDUMA - 1]=ubc_;
+					_snprintf(buff, 1024, "       %9d      %+20.13e      %+20.13e\n", IDUM,pbc_,ubc_);
+					logLine.append(buff);
 				} else if (IDUM < 0)
 				{
 					IPBCT = -1;
+					_snprintf(buff, 1024, "       %9d\n", IDUM);
+					logLine.append(buff);
 				}
 				GNUP1[j] = GNUP;
 			}
+			if (IPBCT != -1)
+			{
+				logLine.append("\n           SPECIFICATIONS MADE IN (OPTIONAL) BCS INPUT FILES TAKE PRECEDENCE OVER THE");
+				logLine.append("\n           DEFAULT VALUES LISTED ABOVE AND ANY VALUES SET IN FUNCTION BCTIME.\n");
+			} else
+			{
+				logLine.append("\n\n            TIME-DEPENDENT SPECIFIED PRESSURE OR INFLOW CONCENTRATION\n");
+				logLine.append("            SET IN FUNCTION BCTIME IS INDICATED BY NEGATIVE NODE NUMBER\n");
+				logLine.append("\n           SPECIFICATIONS MADE IN (OPTIONAL) BCS INPUT FILES TAKE PRECEDENCE OVER THE");
+				logLine.append("\n           DEFAULT VALUES LISTED ABOVE AND ANY VALUES SET IN FUNCTION BCTIME.\n");
+			}
+			lstWriter->add_line(logLine);
+			logLine.clear();
 			QPLITR = std::vector<double>(npbcData.size(), 0);
 			IBCPBC = 0;
 		}
 	
 		if (NUBC != 0)
 		{
+			logLine.append("\n\n\n\n           S P E C I F I E D   C O N C E N T R A T I O N   D A T A\n\n\n\n");
+			logLine.append("           **** NODES AT WHICH SOLUTE CONCENTRATIONS ARE SPECIFIED TO BE INDEPENDENT OF LOCAL FLOWS AND FLUID SOURCES****\n");
+			logLine.append("            NODE     DEFAULT CONCENTRATION\n\n");
 			int IDUM, IDUMA;
 			double ubc_;
 			GNUU1 = std::vector<double>(nubcData.size(), 0);
@@ -2222,17 +2523,55 @@ void Storage::check_data_sets()
 				{
 					ubc_ = std::stod(strtok(NULL, " "));
 					node_ubc[IDUMA - 1]=ubc_;
+					_snprintf(buff, 1024, "       %9d       %+20.13e\n", IDUM,ubc_);
+					logLine.append(buff);
 				} else if (IDUM < 0)
 				{
+					_snprintf(buff, 1024, "       %9d\n", IDUM);
+					logLine.append(buff);
 					IUBCT = -1;
 				}
 				GNUU1[j] = GNUU;
+			}
+			if (IUBCT != -1)
+			{
+				logLine.append("\n           SPECIFICATIONS MADE IN (OPTIONAL) BCS INPUT FILES TAKE PRECEDENCE OVER THE");
+				logLine.append("\n           DEFAULT VALUES LISTED ABOVE AND ANY VALUES SET IN FUNCTION BCTIME.\n");
+
+				
+			} else
+			{
+				logLine.append("\n\n            TIME-DEPENDENT SPECIFIED CONCENTRATIONS USER-PROGRAMMED IN\n");
+				logLine.append("            SET IN FUNCTION BCTIME IS INDICATED BY NEGATIVE NODE NUMBER\n");
+				logLine.append("\n           SPECIFICATIONS MADE IN (OPTIONAL) BCS INPUT FILES TAKE PRECEDENCE OVER THE");
+				logLine.append("\n           DEFAULT VALUES LISTED ABOVE AND ANY VALUES SET IN FUNCTION BCTIME.\n");
+
 			}
 			
 			IBCUBC = 0;
 		}
 	}
 
+
+	
+	
+
+
+
+
+	if (!KINCID)
+	{
+		logLine.append("\n\n\n\n           M E S H   C O N N E C T I O N   D A T A\n\n");
+		logLine.append("                PRINTOUT OF NODAL INCIDENCES CANCELLED.\n");
+		lstWriter->add_line(logLine);
+		logLine.clear();
+	} else
+	{
+		logLine.append("\n\n\n\n           M E S H   C O N N E C T I O N   D A T A\n\n\n");
+		logLine.append("           **** NODAL INCIDENCES ****\n");
+		lstWriter->add_line(logLine);
+		logLine.clear();
+	}
 	if (!strncmp(incidenceData[0].data(), "INCIDENCE", incidenceData[0].size()))
 	{
 		std::cout << "First Line of Data Set 22 must be 'INCIDENCE'.." << std::endl;
@@ -2242,10 +2581,21 @@ void Storage::check_data_sets()
 	{
 		for (std::pair<int, std::vector<int>> inc_ : incidenceContainer)
 		{
-			for (int nod_ : inc_.second)
+			_snprintf(buff, 1024, "           ELEMENT %9d     NODES AT :      CORNERS *****", inc_.first);
+			logLine.append(buff);
+			for (int nod_ : inc_.second){
 				incidence_vector.push_back(nod_);
+				_snprintf(buff, 1024, "%9d ", nod_);
+				logLine.append(buff);
+			}
+			logLine.append("*****\n");
 		}
+		lstWriter->add_line(logLine);
+		logLine.clear();
 	}
+
+
+
 	if (NOBCYC != -1)
 	{
 		std::cout << "NOBCYC != 1, IPSSIM works with 2.2 DataSet" << std::endl;
@@ -2466,7 +2816,7 @@ void Storage::allocate_node_arrays()
 }
 
 void Storage::de_allocate_node_arrays()
-{
+{ 
 	if (KTYPE[0] == 3)
 	{
 		delete[] node_num;
