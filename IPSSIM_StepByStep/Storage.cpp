@@ -3059,6 +3059,39 @@ void Storage::set_steady_state_switches()
 
 void Storage::simulation()
 {
+	Writer * smyWriter = Writer::instance("SMY");
+	Writer * nodWriter = Writer::instance("NOD");
+	Writer * eleWriter = Writer::instance("ELE");
+	Writer * obsWriter = Writer::instance("OBS");
+	std::string smyFile,nodFile,eleFile,obsFile;
+	char buff[1024];
+	std::string logLine;
+	smyFile.append(InputFiles::instance()->getInputDirectory());
+	smyFile.append(InputFiles::instance()->getFilesForWriting()["SMY"]);
+	smyWriter->set_filename(smyFile);
+	nodFile.append(InputFiles::instance()->getInputDirectory());
+	nodFile.append(InputFiles::instance()->getFilesForWriting()["NOD"]);
+	nodWriter->set_filename(nodFile);
+	eleFile.append(InputFiles::instance()->getInputDirectory());
+	eleFile.append(InputFiles::instance()->getFilesForWriting()["ELE"]);
+	eleWriter->set_filename(eleFile);
+	obsFile.append(InputFiles::instance()->getInputDirectory());
+	obsFile.append(InputFiles::instance()->getFilesForWriting()["OBS"]);
+	obsWriter->set_filename(obsFile);
+	logLine.append("\n          ");
+	logLine.append(std::string(53, '='));
+	logLine.append("\n\n");
+	logLine.append(std::string(26, ' '));
+	logLine.append("I   P   S   S   I   M\n\n");
+	logLine.append(std::string(31, ' '));
+	logLine.append("Version v1.0 \n\n");
+	logLine.append("          ");
+	logLine.append(std::string(53, '='));
+	logLine.append("\n");
+	smyWriter->add_line(logLine);
+	logLine.clear();
+
+
 	if (switch_set)
 		goto BEGIN_ITERATION;
 	BEGIN_TIMESTEP:
@@ -5127,6 +5160,83 @@ std::string Storage::setLSTLine(std::string s){
 	tempStr2 = std::string(p2, ' ');
 	tempStr.append(tempStr1 + s + tempStr2);
 	return tempStr;
+
+}
+
+
+void Storage::outLST()
+{
+	Writer * lstWriter = Writer::instance("LST");
+	char buff[1024];
+	std::string logLine;
+	if (KTYPE[0] == 3){ //3D
+		if (ITREL > 0 || ISSFLO == 2 || ISSTRA == 1)
+		{
+
+		} else
+		{
+			logLine.append("\n\n\n\n");
+			logLine.append(std::string(11, ' '));
+			logLine.append("I N I T I A L   C O N D I T I O N S\n");
+			logLine.append(std::string(11, ' '));
+			logLine.append("___________________________________\n");
+			if (IREAD == -1)
+			{
+				logLine.append("\n\n");
+				logLine.append(std::string(11, ' '));
+				logLine.append("INITIAL CONDITIONS RETRIVED FROM A RESTART FILE (WARM START)\n");
+				logLine.append(std::string(11, ' '));
+				logLine.append("THAT WAS SAVED AT THE END OF TIME STEP");
+				logLine.append(std::to_string(ITRST));
+				logLine.append("OF THE ORIGINAL SIMULATION.\n");
+			}
+			if (IT == 0 && ISSFLO == 2)
+			{
+				
+			} else
+			{
+				if (ISSTRA == 1)
+				{
+					
+				} else
+				{
+					logLine.append("\n\n\n");
+					logLine.append(std::string(11, ' '));
+					_snprintf(buff, 1024, "TIME INCREMENT : %+15.4e SECONDS\n\n", DELT);
+					logLine.append(buff);
+					logLine.append(std::string(11, ' '));
+					_snprintf(buff, 1024, "TIME AT END : %+15.4e SECONDS\n", TSEC);
+					logLine.append(buff);
+					logLine.append(std::string(11, ' '));
+					_snprintf(buff, 1024, "OF STEP : %+15.4e MINUTES\n", TMIN);
+					logLine.append(buff);
+					logLine.append(std::string(11, ' '));
+					_snprintf(buff, 1024, "OF STEP : %+15.4e MINUTES\n", TMIN);
+					logLine.append(buff);
+				}
+			}
+
+		}
+	} else
+	{ // 2D
+		
+	}
+
+}
+void Storage::outELE()
+{
+
+}
+void Storage::outNOD()
+{
+	if (!ONCEK5)
+	{
+		
+	}
+
+}
+void Storage::outOBS()
+{
 
 }
 

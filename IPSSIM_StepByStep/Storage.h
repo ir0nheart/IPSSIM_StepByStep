@@ -13,6 +13,10 @@ class Storage
 public:
 	static Storage * instance();
 	void BASIS3_Simple(int L, double XLOC, double YLOC, double ZLOC, double& DET, double CJ[]);
+	void outLST();
+	void outNOD();
+	void outELE();
+	void outOBS();
 	std::string setLSTLine(std::string s);
 	void banner();
 	void BUBSAT(double& SWB, double& RELKB, double PRES, double CNUB, double & RELKT, double& SWT, double SW, double RELK);
