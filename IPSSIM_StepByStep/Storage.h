@@ -305,8 +305,13 @@ private:
 	bool ONCEP;
 	bool SETBCS;
 	bool INTIM;
+	bool onceNOD;
+	bool onceELE;
 	char CINACT;
 
+	int KT;
+	int KTMAX;
+	int KTPRN;
 	int IBCT;
 	int solution_storage;
 	int NN;
@@ -380,7 +385,12 @@ private:
 	int NRTEST;
 	int LRTEST;
 	int LROLD;
+	int ITOUT;
+	int NLAYS;
+	int NNLAY;
 
+	double DURN;
+	double TOUT;
 	double TSECM1;
 	double RELCHG;
 	double DELTM1;
@@ -570,6 +580,7 @@ private:
 	std::vector<double> GXLOC;
 	std::vector<double> GYLOC;
 	std::vector<double> GZLOC;
+	std::string LAYSTR;
 	bool switch_set;
 	bool bcs_defined;
 

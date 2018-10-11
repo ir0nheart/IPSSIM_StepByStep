@@ -15,8 +15,8 @@ std::string Storage::VARNK6[] = { "ELEMENT NUMBER", "X-COORDINATE OF CENTROID", 
 int Storage::J6COL[] = {0,0,0,0,0,0,0};
 std::string Storage::LCOL[] = { "" };
 int Storage::J5COL[] = {0,0,0,0,0,0,0,0,0};
-std::string Storage::NCOL[] = { "" };
-
+//std::string Storage::NCOL[] = { "Node","X","Y","Z","Pressure","Concentration","Saturation","Eff. Stress","Stress Rat." };
+std::string Storage::NCOL[] = { "X", "Y", "Z", "Pressure", "Concentration", "Saturation" };
 template<typename MatrixT, typename VectorT>
 struct monitor_user_data
 {
@@ -2993,6 +2993,8 @@ void Storage::check_restart()
 void Storage::set_flags()
 {
 	ONCEP = false;
+	onceNOD = false;
+	onceELE = false;
 	SETBCS = true;
 	IBCT = IQSOPT + IQSOUT + IPBCT + IUBCT;
 	
@@ -3026,7 +3028,7 @@ void Storage::output_initial_starting_if_transient()
 
 		if (ISSFLO == 0)
 		{
-			
+			outNOD();
 		}
 	}
 }
@@ -5225,14 +5227,379 @@ void Storage::outLST()
 }
 void Storage::outELE()
 {
+	std::string logLine = "";
+	Writer * logWriter = Writer::instance("ELE");
+	char buff[1024];
+	int TS; // Time Step Information
+	int JT; // Time Step Value
+	int LCP,LCV;
+	char CPVX, CPVY, CPVZ;
+	double DELTK;
+	std::vector<double> TT;
+	std::vector<int> ITT;
+	std::vector<int> ISVEL;
+	if (onceELE == false)
+	{
+		std::string eleFile;
+		eleFile.append(InputFiles::instance()->getInputDirectory());
+		eleFile.append(InputFiles::instance()->getFilesForWriting()["ELE"]);
+		logWriter->set_filename(eleFile);
+		KT = 0;
+		for (int jt = 1; jt <= ITMAX; jt++)
+		{
+			if (jt%LCOLPR == 0 || jt == ITRST + 1)
+				KT = KT + 1;
+		}
+
+		if (ITMAX > 1 && ITMAX%LCOLPR != 0)
+			KT = KT + 1;
+
+		KTMAX = KT;
+
+		TS = TSTART;
+		JT = 0;
+		KT = 0;
+		CPVX = CPVY = CPVZ = 'N';
+		for (int i = 0; i < 7; i++){
+			if (J6COL[i] == 4) CPVX = 'Y';
+			if (J6COL[i] == 5) CPVY = 'Y';
+			if (J6COL[i] == 6) CPVZ = 'Y';
+		}
+		LCP = 0;
+		for (int i = 0; i <= ITMAX; i++){
+			TS = schedule_list[time_steps_index]->get_time_at_step(i);
+			JT = schedule_list[time_steps_index]->get_step_time()[i].first;
+			LCV = LCP;
+			if ((JT%NPCYC == 0) || (BCSFL[JT] || JT == 1))
+				LCP = JT;
+			if ((JT%LCOLPR == 0) || (JT == (ITRST + 1))){
+				KT = KT + 1;
+				TT.push_back(TS);
+				ITT.push_back(JT);
+				ISVEL.push_back(LCV);
+				if (JT != 1 || ISSFLO == 2)
+					if (JT %NUCYC != 0 && !BCSTR[JT])
+						ISVEL[KT] = 0;
+			}
+		}
+		if (ISSTRA == 1)
+			TT[KT] = TSTART;
+
+		if (ITMAX > 1 && ITMAX%LCOLPR != 0)
+		{
+			KT = KT + 1;
+			TT.push_back(TS);
+			ITT.push_back(ITMAX);
+			ISVEL.push_back(LCV);
+		}
+		if (ISSFLO != 0)
+		{
+			KTMAX = 1;
+			ISVEL[0] = 0;
+		}
+
+		if (IREAD == 1)
+			KTPRN = KTMAX;
+		else
+			KTPRN = 0;
+
+		for (int i = 0; i < KTMAX; i++)
+		{
+			if (ITT[i] > ITRST)
+				KTPRN = KTPRN + 1;
+		}
+
+		logLine.append("## " + titles[0] + "\n");
+		logLine.append("## " + titles[1] + "\n");
+		logLine.append("## \n");
+		std::string CTYPE2;
+		if (KTYPE[1] > 1){
+
+			if (KTYPE[1] == 3) { CTYPE2 = "BLOCKWISE MESH"; }
+			else{ CTYPE2 = "REGULAR MESH"; }
+
+			if (KTYPE[0] == 3){ // 3D
+				_snprintf(buff, sizeof(buff), "## %1d-D,", KTYPE[0]);
+				logLine.append(buff + CTYPE2);
+				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NN1, NN2, NN3, NN, NE);
+				logLine.append(buff);
+				logLine.append("## \n");
+			}
+			else{ // 2D
+				_snprintf(buff, sizeof(buff), "## %1d-D,", KTYPE[0]);
+				logLine.append(buff + CTYPE2);
+				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NN1, NN2, NN, NE);
+				logLine.append(buff);
+				logLine.append("## \n");
+
+			}
+
+		}
+		else if (KTYPE[1] == 1){
+			_snprintf(buff, sizeof(buff), "## %1d-D, LAYERED MESH [", KTYPE[0]);
+			logLine.append(buff);
+			logLine.append(LAYSTR + "]");
+			_snprintf(buff, sizeof(buff), "       (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NLAYS, NNLAY, NN, NE);
+			logLine.append(buff);
+			logLine.append("## \n");
+		}
+		else{
+			_snprintf(buff, sizeof(buff), "## % 1d - D, IRREGULAR MESH", KTYPE[0]);
+			logLine.append(buff);
+			logLine.append(std::string(40, ' '));
+			_snprintf(buff, sizeof(buff), "%9d Nodes ( %9d Elems)\n", NN, NE);
+			logLine.append(buff);
+			logLine.append("## \n");
+		}
+
+		logLine.append("## " + std::string(92, '=') + "\n## VELOCITY RESULTS" + std::string(48, ' '));
+		_snprintf(buff, 1024, "%9d Time steps printed\n", KTPRN);
+		logLine.append(buff);
+		logLine.append("## " + std::string(92, '=') + "\n## \n");
+		logLine.append("##     Time steps" + std::string(22, ' ') + "[Printed? / Time step on which V is based]\n");
+		logLine.append("##    in this file      Time (sec)          VX             VY             VZ\n");
+		logLine.append("##  " + std::string(14, '-') + "   " + std::string(13, '-') + "    " + std::string(12, '-') + "   " + std::string(12, '-') + "   " + std::string(12, '-')+"\n");
+		for (int i = 1; i <= KTMAX; i++){
+			if (ITT[i] >= ITRST){
+				_snprintf(buff, sizeof(buff), "##        %8d    %+13.6e      %c %8d     %c %8d     %c %8d\n", ITT[i], TT[i],CPVX, ISVEL[i],CPVY,ISVEL[i],CPVZ,ISVEL[i]);
+				logLine.append(buff);
+			}
+		}
+		onceELE = true;
+	}
+
+	if ((ISSFLO == 2) && (IT > 1))
+		return;
+
 
 }
 void Storage::outNOD()
 {
-	if (!ONCEK5)
-	{
-		
+	std::string logLine = "";
+	Writer * logWriter = Writer::instance("NOD");
+	char buff[512];
+	
+	int JT; // Time Step Value
+	int TS; // Time Step Information
+	double DELTK; // time sstep increment
+	std::vector<double> TT;
+	std::vector<int> ITT;
+	std::vector<int> ISHORP, ISTORC, ISSATU;
+	int LCHORP, LCTORC;
+	char CPSATU, CPTORC, CPHORP;
+	NCOLPR = node_output_every;
+	std::string header = "\nNode              X              Y              Z       Pressure  Concentration     Saturation\n";
+	if (onceNOD == false){
+
+		std::string nodFile;
+		nodFile.append(InputFiles::instance()->getInputDirectory());
+		nodFile.append(InputFiles::instance()->getFilesForWriting()["NOD"]);
+		logWriter->set_filename(nodFile);
+		if (ISSTRA != 1){
+			KT = 1;
+		}
+		else{
+			KT = 0;
+		}
+		for (int i = 1; i <= ITMAX; i++){
+			if (((i%NCOLPR) == 0) || (i == ITRST) || ((i == (ITRST + 1)) && ((ISSTRA != 0) || (NCOLPR >0)))){
+				KT = KT + 1;
+			}
+		}
+		if (ITMAX > 1 && (ITMAX%NCOLPR != 0))
+			KT = KT + 1;
+
+		KTMAX = KT;
+		TS = TSTART;
+		JT = 0;
+		KT = 0;
+		DELTK = DELT;
+
+
+
+		// pressure conc sat print y or no
+		// KPANDS pressure and sat
+		if (KPANDS == 1){
+			CPHORP = CPSATU = 'Y';
+		}
+		else{ CPHORP = CPSATU = 'N'; }
+		if (KCORT == 1){
+			CPTORC = 'Y';
+
+		}
+		else{ CPTORC = 'N'; }
+		//KCORD concentration
+
+		if (ISSTRA != 1){
+			KT = KT + 1;
+			TT.push_back(TS);
+			ITT.push_back(JT);
+			ISHORP.push_back(0);
+			ISTORC.push_back(0);
+			ISSATU.push_back(0);
+		}
+
+		for (int i = 0; i <= ITMAX; i++){
+			TS = schedule_list[time_steps_index]->get_time_at_step(i);
+			JT = schedule_list[time_steps_index]->get_step_time()[i].first;
+
+			if ((JT%NPCYC == 0) || (BCSFL[JT] || JT == 1))
+				LCHORP = JT;
+			if ((JT%NUCYC == 0) || (BCSTR[JT] || JT == 1))
+				LCTORC = JT;
+			if ((JT%NCOLPR == 0) || (JT == ITRST) || ((JT == (ITRST + 1)) && ((ISSTRA != 0) || NCOLPR >0))){
+				KT = KT + 1;
+				TT.push_back(TS);
+				ITT.push_back(JT);
+				ISHORP.push_back(LCHORP);
+				ISTORC.push_back(LCTORC);
+				ISSATU.push_back(LCHORP);
+			}
+		}
+
+		if (ISSTRA == 1){
+			TT.push_back(TSTART);
+			ITT.push_back(0);
+		}
+
+		if (ITMAX > 1 && (ITMAX%NCOLPR != 0)){
+			KT = KT + 1;
+			TS = schedule_list[time_steps_index]->get_time_at_step(ITMAX);
+			TT.push_back(TS);
+			ITT.push_back(ITMAX);
+			if ((ITMAX%NPCYC == 0) || (BCSFL[ITMAX]))
+				LCHORP = ITMAX;
+			if ((ITMAX%NPCYC == 0) || (BCSTR[ITMAX]))
+				LCTORC = ITMAX;
+			ISHORP.push_back(LCHORP);
+			ISTORC.push_back(LCTORC);
+			ISSATU.push_back(LCHORP);
+		}
+
+		if (ISSFLO != 0){
+			for (int i = 0; i < KTMAX; i++){
+				ISHORP.push_back(0);
+				ISSATU.push_back(0);
+			}
+		}
+
+		if (IREAD == 1){ KTPRN = KTMAX; }
+		else{
+			KTPRN = 0;
+			for (int i = 1; i <= KTMAX; i++){
+				if (ITT[i] > ITRST)
+					KTPRN = KTPRN + 1;
+			}
+		}
+
+		logLine.append("## " + titles[0] + "\n");
+		logLine.append("## " + titles[1]+ "\n");
+		logLine.append("## \n");
+
+		std::string CTYPE2;
+		if (KTYPE[1] > 1){
+
+			if (KTYPE[1] == 3) { CTYPE2 = "BLOCKWISE MESH"; }
+			else{ CTYPE2 = "REGULAR MESH"; }
+
+			if (KTYPE[0] == 3){ // 3D
+				_snprintf(buff, sizeof(buff), "## %1d-D,", KTYPE[0]);
+				logLine.append(buff + CTYPE2);
+				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NN1, NN2, NN3, NN, NE);
+				logLine.append(buff);
+				logLine.append("## \n");
+			}
+			else{ // 2D
+				_snprintf(buff, sizeof(buff), "## %1d-D,", KTYPE[0]);
+				logLine.append(buff + CTYPE2);
+				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NN1, NN2, NN, NE);
+				logLine.append(buff);
+				logLine.append("## \n");
+
+			}
+
+		}
+		else if (KTYPE[1] == 1){
+			_snprintf(buff, sizeof(buff), "## %1d-D, LAYERED MESH [", KTYPE[0]);
+			logLine.append(buff);
+			logLine.append(LAYSTR + "]");
+			_snprintf(buff, sizeof(buff), "       (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NLAYS, NNLAY, NN, NE);
+			logLine.append(buff);
+			logLine.append("## \n");
+		}
+		else{
+			_snprintf(buff, sizeof(buff), "## % 1d - D, IRREGULAR MESH", KTYPE[0]);
+			logLine.append(buff);
+			logLine.append(std::string(40, ' '));
+			_snprintf(buff, sizeof(buff), "%9d Nodes ( %9d Elems)\n", NN, NE);
+			logLine.append(buff);
+			logLine.append("## \n");
+		}
+
+
+		logLine.append("## " + std::string(92, '=') + "\n## NODEWISE RESULTS" + std::string(48, ' '));
+		_snprintf(buff, sizeof(buff), "%9d Time steps printed\n", KTPRN);
+		logLine.append(buff);
+		logLine.append("## " + std::string(92, '=') + "\n## \n");
+		logLine.append("##    Time steps" + std::string(23, ' ') + "[Printed? / Latest time step computed]\n");
+		logLine.append("##    in this file      Time (sec)         Press          Conc           Sat\n");
+		logLine.append("##   " + std::string(14, '-') + "   " + std::string(13, '-') + "    " + std::string(12, '-') + "   " + std::string(12, '-') + "   " + std::string(12, '-') + "\n");
+
+
+
+		for (int i = 1; i <= KTMAX; i++){
+			if (ITT[i] >= ITRST){
+				_snprintf(buff, sizeof(buff), "##        %8d    %+13.6e      %c %8d     %c %8d     %c %8d\n", ITT[i], TT[i], CPHORP, ISHORP[i], CPTORC, ISTORC[i], CPSATU, ISSATU[i]);
+				logLine.append(buff);
+			}
+		}
+
+
+
+		onceNOD = true;
 	}
+	if ((IT == 0) || ((IT == 1) && (ISSTRA == 1))){
+		DURN = 0.0;
+		TOUT = TSTART;
+		ITOUT = 0;
+	}
+	else{
+		DURN = DELT;
+		TOUT = TSEC;
+		ITOUT = IT;
+	}
+
+	logLine.append("## \n");
+	logLine.append("## " + std::string(98, '=') + "\n");
+	_snprintf(buff, sizeof(buff), "## TIME STEP %8d", ITOUT);
+	logLine.append(buff + std::string(26, ' '));
+	_snprintf(buff, sizeof(buff), "Duration: %+11.4e sec      Time: %+11.4e sec\n", DURN, TOUT);
+	logLine.append(buff);
+	logLine.append("## " + std::string(98, '=') + "\n");
+
+
+
+
+
+
+
+	//if (NCOL[0] == "'N'"){ // printNodeNumber
+	logLine.append("##");
+	for (std::string a : NCOL){
+		int fil = 15 - a.length();
+		logLine.append(std::string(fil, ' ') + a + "  ");
+	}
+
+	logLine.append("\n");
+
+	for (int i =0 ; i < NN; i++){
+
+		_snprintf(buff, sizeof(buff), "  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e\n", node_x[i],node_y[i],node_z[i],node_pvec[i],node_uvec[i],node_swt[i]);
+		logLine.append(buff);
+	}
+
+
+	logWriter->add_line(logLine);
 
 }
 void Storage::outOBS()
