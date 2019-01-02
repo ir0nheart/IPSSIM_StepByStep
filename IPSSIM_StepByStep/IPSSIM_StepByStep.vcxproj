@@ -65,7 +65,9 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="UserMacros">
+    <NuGetPackageImportStamp>929227d3</NuGetPackageImportStamp>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
@@ -146,6 +148,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Bcs.h" />
+    <ClInclude Include="BinaryOut.h" />
     <ClInclude Include="DataSet.h" />
     <ClInclude Include="Element.h" />
     <ClInclude Include="gmres.h" />
@@ -163,6 +166,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Bcs.cpp" />
+    <ClCompile Include="BinaryOut.cpp" />
     <ClCompile Include="DataSet.cpp" />
     <ClCompile Include="Element.cpp" />
     <ClCompile Include="InputFiles.cpp" />
@@ -183,6 +187,5 @@
     <ClCompile Include="Writer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionTargets" />
 </Project>

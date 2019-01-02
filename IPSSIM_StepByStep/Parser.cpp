@@ -6,6 +6,7 @@
 #include "Storage.h"
 #include <cctype>
 #include "Bcs.h"
+#include <algorithm>
 
 class Storage;
 
@@ -315,7 +316,7 @@ void Parser::parseDataSet_2B()
 		}
 		*i = tmp;
 	}
-	std::vector<std::vector<char>> parsed_strings(6);
+	std::vector<std::vector<char>> parsed_strings(8);
 
 	int it = 0;
 	for (char c : lines[0])
@@ -330,17 +331,41 @@ void Parser::parseDataSet_2B()
 		if (c == ' ')
 			it++;
 	}
+
 	storage->set_mesh_dim_string(parsed_strings[0]);
 	storage->set_mesh_type_string(parsed_strings[1]);
-	if (parsed_strings.size() == 5)
+	std::vector<std::string> parsed_str;
+	for (int i = 0; i < 8; i++)
 	{
-		storage->set_nn1_string(parsed_strings[3]);
-		storage->set_nn2_string(parsed_strings[4]);
-	} else if (parsed_strings.size() == 6)
+		std::string tmp = std::string(parsed_strings[i].begin(), parsed_strings[i].end());
+		if (tmp != "")
+			parsed_str.push_back(tmp);
+
+	}
+
+		
+	if (std::find(parsed_str.begin(), parsed_str.end(), "REGULAR") != parsed_str.end()){
+		if (parsed_str.size() == 5)
+		{
+			storage->set_nn1_string(parsed_strings[3]);
+			storage->set_nn2_string(parsed_strings[4]);
+		}
+		else if (parsed_str.size() == 6)
+		{
+			storage->set_nn1_string(parsed_strings[3]);
+			storage->set_nn2_string(parsed_strings[4]);
+			storage->set_nn3_string(parsed_strings[5]);
+		}
+	}
+	else if (std::find(parsed_str.begin(), parsed_str.end(), "ACROSS") != parsed_str.end())
 	{
-		storage->set_nn1_string(parsed_strings[3]);
-		storage->set_nn2_string(parsed_strings[4]);
-		storage->set_nn3_string(parsed_strings[5]);
+		storage->set_nl_across(parsed_strings[3]);
+		storage->set_nn_across(parsed_strings[4]);
+		storage->set_ne_across(parsed_strings[5]);
+	} else
+	{
+		std::cout << "Undefined Mesh Structure." << std::endl;
+		SimulationControl::exitOnError();
 	}
 }
 

@@ -7,6 +7,7 @@
 #include "Parser.h"
 #include "InputFiles.h"
 #include "Writer.h"
+#include "BinaryOut.h"
 Storage * Storage::m_pInstance = nullptr;
 std::string Storage::K5SYM[] = { "N", "X", "Y", "Z", "P", "U", "S", "ES", "RU" };
 std::string Storage::K6SYM[] = { "E","X","Y","Z","VX","VY","VZ" };
@@ -83,6 +84,21 @@ std::vector<char> Storage::get_nn2_string() const
 std::vector<char> Storage::get_nn3_string() const
 {
 	return nn3_string;
+}
+
+std::vector<char> Storage::get_nl_across() const
+{
+	return nl_across;
+}
+
+std::vector<char> Storage::get_ne_across() const
+{
+	return ne_across;
+}
+
+std::vector<char> Storage::get_nn_across() const
+{
+	return nn_across;
 }
 
 std::vector<char> Storage::get_flow_type_string() const
@@ -888,9 +904,13 @@ void Storage::check_data_sets()
 	{
 		KTYPE.push_back(0);
 	}
+	else if (!strncmp(mesh_type_string.data(), "LAYERED", mesh_type_string.size()))
+	{
+		KTYPE.push_back(0);
+	}
 	else
 	{
-		std::cout << "Mesh is not REGULAR or IRREGULAR" << std::endl;
+		std::cout << "Mesh Structure is not defined" << std::endl;
 		SimulationControl::exitOnError("INP-2B-4");
 	}
 
@@ -1644,6 +1664,7 @@ void Storage::check_data_sets()
 	allocate_node_arrays();
 	if (KTYPE[0] == 3){
 		NRTEST = 1;
+		Timer tt;
 		for (int j = 0; j < nodeData.size();j++)
 		{
 			
@@ -1657,6 +1678,7 @@ void Storage::check_data_sets()
 				NRTEST++;
 			NROLD = node_nreg[j];
 		}
+		std::cout << tt << "seconds for nodes" << std::endl;
 	} else
 	{
 		//2D Nodes
@@ -2118,8 +2140,8 @@ void Storage::check_data_sets()
 		PMIDFA = std::stod(std::string(element_props[2].begin(), element_props[2].end()));
 		PMINFA = std::stod(std::string(element_props[3].begin(), element_props[3].end()));
 		ANG1FA = std::stod(std::string(element_props[4].begin(), element_props[4].end()));
-		ANG1FA = std::stod(std::string(element_props[5].begin(), element_props[5].end()));
-		ANG1FA = std::stod(std::string(element_props[6].begin(), element_props[6].end()));
+		ANG2FA = std::stod(std::string(element_props[5].begin(), element_props[5].end()));
+		ANG3FA = std::stod(std::string(element_props[6].begin(), element_props[6].end()));
 		ALMAXF = std::stod(std::string(element_props[7].begin(), element_props[7].end()));
 		ALMIDF = std::stod(std::string(element_props[8].begin(), element_props[8].end()));
 		ALMINF = std::stod(std::string(element_props[9].begin(), element_props[9].end()));
@@ -3210,8 +3232,7 @@ BEGIN_ITERATION:
 			{
 				node_piter[ii] = BDELP1 * node_pvec[ii] - BDELP*node_pm1[ii];
 				node_uiter[ii] = BDELU1 * node_uvec[ii] - BDELU*node_um1[ii];
-
-				node_dpdtitr[ii] = (node_pvec[ii] / node_pm1[ii]) / DLTPM1;
+				node_dpdtitr[ii] = (node_pvec[ii] - node_pm1[ii]) / DLTPM1;
 				node_pm1[ii] = node_pvec[ii];
 				node_um2[ii] = node_um1[ii];
 				node_um1[ii] = node_uvec[ii];
@@ -3300,7 +3321,7 @@ BEGIN_ITERATION:
 			{
 				init_a_val(UMAT, NELT, 0.0);
 			}
-			init_a_val(node_p_rhs, NN, 0.0);
+			init_a_val(node_u_rhs, NN, 0.0);
 		}
 	} else
 	{
@@ -3308,7 +3329,7 @@ BEGIN_ITERATION:
 		{
 			init_a_val(UMAT, NELT, 0.0);
 		}
-		init_a_val(node_p_rhs, NN, 0.0);
+		init_a_val(node_u_rhs, NN, 0.0);
 	}
 
 
@@ -3344,8 +3365,9 @@ BEGIN_ITERATION:
 		std::string f_file = "p_vec";
 		f_file.append(std::to_string(IT));
 		f_file.append(".bin");
-		
 		std::ofstream outpvecbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+		double rhsSize = (double)NN;
+		outpvecbin.write(reinterpret_cast < const char*>(&rhsSize), sizeof(double));
 		for (int i = 0; i < NN; i++)
 			outpvecbin.write(reinterpret_cast < const char*>(&node_p_rhs[0] + i), sizeof(double));
 		outpvecbin.close();
@@ -3354,6 +3376,7 @@ BEGIN_ITERATION:
 		f_file.append(std::to_string(IT));
 		f_file.append(".bin");
 		std::ofstream outuvecbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+		outpvecbin.write(reinterpret_cast < const char*>(&rhsSize), sizeof(double));
 		for (int i = 0; i < NN; i++)
 			outuvecbin.write(reinterpret_cast < const char*>(&node_u_rhs[0] + i), sizeof(double));
 		outuvecbin.close();
@@ -3362,6 +3385,8 @@ BEGIN_ITERATION:
 		f_file.append(std::to_string(IT));
 		f_file.append(".bin");
 		std::ofstream outumatbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+		double nNelt = (double)NELT;
+			outumatbin.write(reinterpret_cast < const char*>(&nNelt), sizeof(double));
 		for (int i = 0; i < NELT; i++)
 			outumatbin.write(reinterpret_cast < const char*>(&UMAT[0] + i), sizeof(double));
 		outumatbin.close();
@@ -3370,11 +3395,32 @@ BEGIN_ITERATION:
 		f_file.append(std::to_string(IT));
 		f_file.append(".bin");
 		std::ofstream outpmatbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+		outpmatbin.write(reinterpret_cast < const char*>(&nNelt), sizeof(double));
 		for (int i = 0; i < NELT; i++)
 			outpmatbin.write(reinterpret_cast < const char*>(&PMAT[0] + i), sizeof(double));
 		outpmatbin.close();
 
-
+		if (!ONCEP)
+		{
+			f_file = "IA";
+			f_file.append(std::to_string(IT));
+			f_file.append(".bin");
+			int IAsize = (int)IA.size();
+			std::ofstream outiabin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+			outiabin.write(reinterpret_cast < const char*>(&IAsize), sizeof(int));
+			for (int i = 0; i < IAsize; i++)
+				outiabin.write(reinterpret_cast < const char*>(&IA[0] + i), sizeof(int));
+			outiabin.close();
+			f_file = "JA";
+			f_file.append(std::to_string(IT));
+			f_file.append(".bin");
+			int JAsize = (int)JA.size();
+			std::ofstream outjabin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+			outjabin.write(reinterpret_cast < const char*>(&JAsize), sizeof(int));
+			for (int i = 0; i < JAsize; i++)
+				outjabin.write(reinterpret_cast < const char*>(&JA[0] + i), sizeof(int));
+			outjabin.close();
+		}
 		
 		double pnorm = DNRM2(NN, node_p_rhs, 1);
 		if (pnorm == 0)
@@ -3394,71 +3440,30 @@ BEGIN_ITERATION:
 			for (int i = 0; i < NN + 1; i++)
 				A.col_ptr(i) = JA[i];
 
-			VECTOR_double b, x(A.dim(1), 0.0);
-			b.newsize(NN);
+			VECTOR_double b(NN,0), x(A.dim(1), 0.0);
+			//b.newsize(NN);
 			for (int i = 0; i < NN; i++)
 				b(i) = node_p_rhs[i];
-			int restart = 32, result, it = 2000;
+			int restart = 20, result, it = 2000;
 			MATRIX_double H(restart + 1, restart, 0.0);
 			CompCol_ILUPreconditioner_double M(A);
 			double tol = 1.e-13;
-
+			std::cout << "\tStarting P - Solution using GMRES solver..." << std::endl;
 			result = GMRES(A, x, b, M, H, restart, it, tol);
-
+			
 			if (!result)
+			{
 				ONCEP = true;
+				std::cout << "\tP - Solution Converged in " << it << " iterations  (Error ~ " << tol << " )" << std::endl;
+			}
+				
 			for (int i = 0; i < NN; i++)
 				node_p_solution[i] = x(i);
 
-			std::cout << " GMRES flag " << result << std::endl;
-			std::cout << "iterations performed : " << it << std::endl;
-			std::cout << "tolerance achieved : " << tol << std::endl;
-			std::cout << "done " << std::endl;
-			// if but we will try gmres
-			// solve for p;
-			// convert to row compressed
-			/*
-			re_orient_matrix(NN + 1, NELT, PMAT, JA, IA, new_MAT, row_jumper, col_indices);
-			// set vienna cl rhs vector
-			viennacl::vector<double> vcl_rhs = viennacl::scalar_vector<double>(NN, 0.0);
-			for (int i = 0; i < NN; i++)
-				vcl_rhs[i] = node_p_rhs[i];
-			// Set Matrix;
-			viennacl::compressed_matrix<double> A;
-			A.set(row_jumper, col_indices, new_MAT, NN, NN,NELT);
-
-			//As initial guess we take a vector consisting of all 0.9s, except for the first entry, which we set to zero:
-			
-			viennacl::vector<double> init_guess = viennacl::scalar_vector<double>(A.size2(), double(0.9));
-			init_guess[0] = 0;
-
-			// Set up the monitor data, holding the system matrix, the right hand side, and the initial guess:
-		
-			monitor_user_data<viennacl::compressed_matrix<double>, viennacl::vector<double> > my_monitor_data(A, vcl_rhs, init_guess);
-
-
-			for (int i = 0; i < NN + 1; i++)
-			{
-				row_jumper[i] = 0;
-			}
-			for (int i = 0; i < NELT; i++)
-			{
-				col_indices[i] = 0;
-				new_MAT[i] = 0;
-			}
-			// Preconditioner
-			viennacl::linalg::ilu0_tag my_tag;
-			viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0_precond(A, my_tag);
-			viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 2000,40);
-			viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
-			my_gmres_solver.set_monitor(my_custom_monitor<viennacl::vector<double>, double, viennacl::compressed_matrix<double> >, &my_monitor_data);
-			my_gmres_solver.set_initial_guess(init_guess);
-			viennacl::vector<double> vcl_results(A.size2());
-			vcl_results= my_gmres_solver(A, vcl_rhs, ilu0_precond);
-			for (int i = 0; i < NN; i++)
-				node_p_rhs[i] = vcl_results[i];
-			int ITRS = my_gmres_solver.tag().iters();
-			double ERR = my_gmres_solver.tag().error();*/
+			//std::cout << " GMRES flag " << result << std::endl;
+			//std::cout << "iterations performed : " << it << std::endl;
+			//std::cout << "tolerance achieved : " << tol << std::endl;
+			//std::cout << "done " << std::endl;
 		}
 
 		if (ISSFLO != 0)
@@ -3475,7 +3480,7 @@ BEGIN_ITERATION:
 			{
 				for (int i = 0; i < NN; i++)
 					node_u_solution[i] = 0.0;
-				std::cout << " U Solution inferred from matrix equation" << std::endl;
+				std::cout << "\tU Solution inferred from matrix equation" << std::endl;
 			} else
 			{
 				CompCol_Mat_double A;
@@ -3496,62 +3501,23 @@ BEGIN_ITERATION:
 				MATRIX_double H(restart + 1, restart, 0.0);
 				CompCol_ILUPreconditioner_double M(A);
 				double tol = 1.e-13;
-
+				std::cout << "\tStarting U - Solution using GMRES solver..." << std::endl;
 				result = GMRES(A, x, b, M, H, restart, it, tol);
-				
+				if (!result)
+				{
+					std::cout << "\tU - Solution Converged in " << it << " iterations  (Error ~ " << tol << " )" << std::endl;
+				}
 				for (int i = 0; i < NN; i++)
 					node_u_solution[i] = x(i);
 
-				std::cout << " GMRES flag " << result << std::endl;
+				/*std::cout << " GMRES flag " << result << std::endl;
 				std::cout << "iterations performed : " << it << std::endl;
 				std::cout << "tolerance achieved : " << tol << std::endl;
-				std::cout << "done " << std::endl;
-				//// Solve for U;
-				//re_orient_matrix(NN + 1, NELT, UMAT, JA, IA, new_MAT, row_jumper, col_indices);
-				//// set vienna cl rhs vector
-				//viennacl::vector<double> vcl_rhs = viennacl::scalar_vector<double>(NN, 0.0);
-				//for (int i = 0; i < NN; i++)
-				//	vcl_rhs[i] = node_u_rhs[i];
-				//// Set Matrix;
-				//viennacl::compressed_matrix<double> A;
-				//A.set(row_jumper, col_indices, new_MAT, NN, NN,NELT);
-
-				////As initial guess we take a vector consisting of all 0.9s, except for the first entry, which we set to zero:
-				//
-				//viennacl::vector<double> init_guess = viennacl::scalar_vector<double>(A.size2(), double(0.9));
-				//init_guess[0] = 0;
-
-				//// Set up the monitor data, holding the system matrix, the right hand side, and the initial guess:
-				//
-				//monitor_user_data<viennacl::compressed_matrix<double>, viennacl::vector<double> > my_monitor_data(A, vcl_rhs, init_guess);
-
-
-				//for (int i = 0; i < NN + 1; i++)
-				//{
-				//	row_jumper[i] = 0;
-				//}
-				//for (int i = 0; i < NELT; i++)
-				//{
-				//	col_indices[i] = 0;
-				//	new_MAT[i] = 0;
-				//}
-				//// Preconditioner
-				//viennacl::linalg::ilu0_tag my_tag;
-				//viennacl::linalg::ilu0_precond<viennacl::compressed_matrix<double>> ilu0(A, my_tag);
-				//viennacl::linalg::gmres_tag my_gmres_tag(1e-13, 1600,40);
-				//viennacl::linalg::gmres_solver<viennacl::vector<double> > my_gmres_solver(my_gmres_tag);
-				//my_gmres_solver.set_monitor(my_custom_monitor<viennacl::vector<double>, double, viennacl::compressed_matrix<double> >, &my_monitor_data);
-				//my_gmres_solver.set_initial_guess(init_guess);
-				//viennacl::vector<double> vcl_results(A.size2());
-				//vcl_results = my_gmres_solver(A, vcl_rhs, ilu0);
-				//for (int i = 0; i < NN; i++)
-				//	node_u_rhs[i] = vcl_results[i];
-				//int ITRS = my_gmres_solver.tag().iters();
-				//double ERR = my_gmres_solver.tag().error();
+				std::cout << "done " << std::endl;*/
 			}
 		}
 
-		for (int i = 0; i < NN; i++)
+	/*	for (int i = 0; i < NN; i++)
 		{
 			node_cnubm1[i] = node_cnub[i];
 			double ueff = max(node_u_solution[i], 1e-10);
@@ -3577,13 +3543,21 @@ BEGIN_ITERATION:
 				node_relk[i] = 1.0;
 				BUBSAT(node_swb[i], node_relkb[i], node_p_solution[i], node_cnub[i], node_relkt[i], node_swt[i],node_sw[i], node_relk[i]);
 			}
-		}
+		}*/
 		for (int i = 0; i < NN; i++)
 		{
 			node_pvec[i] = node_p_solution[i];
 			node_uvec[i] = node_u_solution[i];
 		}
+		if (IT == ITMAX)
+			ISTOP = 1;
+		if (ISTOP == 0)
 		goto BEGIN_TIMESTEP;
+
+		// END OF SIMULATION DEALLOCATE ARRAYS AND SAY BB :D
+		std::cout << "END OF SIMULATION " << std::endl;
+		de_allocate_node_arrays();
+		de_allocate_element_arrays();
 }
 
 
@@ -3949,7 +3923,8 @@ void Storage::ELEMN3()
 					xloc = XIX * GLOC;
 					yloc = YIY * GLOC;
 					zloc = ZIZ * GLOC;
-					BASIS3(1, l, xloc, yloc, zloc, F[kgx], W[kgx], DET[kgx], CJ, DFDXG[kgx], DFDYG[kgx], DFDZG[kgx], DWDXG[kgx], DWDYG[kgx], DWDZG[kgx], swbg[kgx], relkbg[kgx], vxg[kgx], vyg[kgx], vzg[kgx], vgmag[kgx], swtg[kgx], relktg[kgx], viscg[kgx], rhog[kgx], rgxg[kgx], rgyg[kgx], rgzg[kgx], porg[kgx]);
+					BASIS3(1, l, xloc, yloc, zloc, F[kgx], W[kgx], DET[kgx], CJ, DFDXG[kgx], DFDYG[kgx], DFDZG[kgx],
+						DWDXG[kgx], DWDYG[kgx], DWDZG[kgx], swbg[kgx], relkbg[kgx], vxg[kgx], vyg[kgx], vzg[kgx], vgmag[kgx], swtg[kgx], relktg[kgx], viscg[kgx], rhog[kgx], rgxg[kgx], rgyg[kgx], rgzg[kgx], porg[kgx]);
 					XIX = -XIX;
 					kgx++;
 				}
@@ -3957,7 +3932,18 @@ void Storage::ELEMN3()
 			}
 			ZIZ = -ZIZ;
 		}
+
+		// Transpose Matrices for indice compatibility of SUTRA
 		
+		transpose(F);
+		transpose(W);
+		transpose(DFDXG);
+		transpose(DFDYG);
+		transpose(DFDZG);
+		transpose(DWDXG);
+		transpose(DWDYG);
+		transpose(DWDZG);
+
 		//calculate velocity at element centroid
 		if (kvcalc - 2 == 0)
 		{
@@ -3972,9 +3958,9 @@ void Storage::ELEMN3()
 			el_vmag[l] = sqrt(axsum*axsum + aysum + aysum + azsum + azsum);
 			if (el_vmag[l] != 0.0)
 			{
-				el_vang2[l] = asin(azsum / el_vmag[l]) *57.2957795130823;
+				el_vang2[l] = asin(azsum / el_vmag[l]) *57.29577951308232;
 				el_vmag[l] = el_vmag[l] * 0.125;
-				el_vang1[l] = atan2(aysum, axsum)*57.2957795130823;
+				el_vang1[l] = atan2(aysum, axsum)*57.29577951308232;
 			}
 			else
 			{
@@ -4040,18 +4026,18 @@ void Storage::ELEMN3()
 			 rdrz = rzxgd*rgxg[kg] + rzygd*rgyg[kg] + rzzgd*rgzg[kg];
 			for (int i = 0; i < 8; i++)
 			{
-				vole[i] = vole[i] + F[kg][i] * DET[kg];
-				dflowe[i] = dflowe[i] + rdrx*DWDXG[kg][i] + rdry*DWDYG[kg][i] + rdrz*DWDZG[kg][i];
+				vole[i] = vole[i] + F[i][kg] * DET[kg];
+				dflowe[i] = dflowe[i] + rdrx*DWDXG[i][kg] + rdry*DWDYG[i][kg] + rdrz*DWDZG[i][kg];
 			}
 
 			for (int j = 0; j < 8; j++)
 			{
 			
-				rddfjx = rxxgd*DFDXG[kg][j] + rxygd*DFDYG[kg][j] + rxzgd*DFDZG[kg][j];
-				rddfjy = ryxgd*DFDXG[kg][j] + ryygd*DFDYG[kg][j] + ryzgd*DFDZG[kg][j];
-			    rddfjz = rzxgd*DFDXG[kg][j] + rzygd*DFDYG[kg][j] + rzzgd*DFDZG[kg][j];
+				rddfjx = rxxgd*DFDXG[j][kg] + rxygd*DFDYG[j][kg] + rxzgd*DFDZG[j][kg];
+				rddfjy = ryxgd*DFDXG[j][kg] + ryygd*DFDYG[j][kg] + ryzgd*DFDZG[j][kg];
+			    rddfjz = rzxgd*DFDXG[j][kg] + rzygd*DFDYG[j][kg] + rzzgd*DFDZG[j][kg];
 				for (int p = 0; p < 8; p++){
-					bflowe[j][p] = bflowe[j][p] + DWDXG[kg][p] * rddfjx + DWDYG[kg][p] * rddfjy + DWDZG[kg][p] * rddfjz;
+					bflowe[p][j] = bflowe[p][j] + DWDXG[p][kg] * rddfjx + DWDYG[p][kg] * rddfjy + DWDZG[p][kg] * rddfjz;
 				}
 			}
 		}
@@ -4085,20 +4071,20 @@ void Storage::ELEMN3()
 			for (int i = 0; i < 8; i++)
 			{
 			
-				vole[i] = vole[i] + F[kg][i] * DET[kg];
-				dflowe[i] = dflowe[i] + rdrx*DFDXG[kg][i] + rdry*DFDYG[kg][i] + rdrz*DFDZG[kg][i];
+				vole[i] = vole[i] + F[i][kg] * DET[kg];
+				dflowe[i] = dflowe[i] + rdrx*DFDXG[i][kg] + rdry*DFDYG[i][kg] + rdrz*DFDZG[i][kg];
 			}
 
 			for (int j = 0; j < 8; j++)
 			{
 			
-				rddfjx = rxxgd*DFDXG[kg][j] + rxygd*DFDYG[kg][j] + rxzgd*DFDZG[kg][j];
-				rddfjy = ryxgd*DFDXG[kg][j] + ryygd*DFDYG[kg][j] + ryzgd*DFDZG[kg][j];
-				rddfjz = rzxgd*DFDXG[kg][j] + rzygd*DFDYG[kg][j] + rzzgd*DFDZG[kg][j];
+				rddfjx = rxxgd*DFDXG[j][kg] + rxygd*DFDYG[j][kg] + rxzgd*DFDZG[j][kg];
+				rddfjy = ryxgd*DFDXG[j][kg] + ryygd*DFDYG[j][kg] + ryzgd*DFDZG[j][kg];
+				rddfjz = rzxgd*DFDXG[j][kg] + rzygd*DFDYG[j][kg] + rzzgd*DFDZG[j][kg];
 				for (int p = 0; p < 8; p++)
 				{
 			
-					bflowe[j][p] = bflowe[j][p] + DFDXG[kg][p] * rddfjx + DFDYG[kg][p] * rddfjy + DFDZG[kg][p] * rddfjz;
+					bflowe[p][j] = bflowe[p][j] + DFDXG[p][kg] * rddfjx + DFDYG[p][kg] * rddfjy + DFDZG[p][kg] * rddfjz;
 				}
 					
 			}
@@ -4182,14 +4168,14 @@ void Storage::ELEMN3()
 			for (int j = 0; j < 8; j++)
 			{
 				
-				bddfjx = BXXGD*DFDXG[kg][j] + BXYGD*DFDYG[kg][j] + BXZGD*DFDZG[kg][j];
-				bddfjy = BYXGD*DFDXG[kg][j] + BYYGD*DFDYG[kg][j] + BYZGD*DFDZG[kg][j];
-				bddfjz = BZXGD*DFDXG[kg][j] + BZYGD*DFDYG[kg][j] + BZZGD*DFDZG[kg][j];
-				eddfj = EXGD*DFDXG[kg][j] + EYGD*DFDYG[kg][j] + EZGD*DFDZG[kg][j];
+				bddfjx = BXXGD*DFDXG[j][kg] + BXYGD*DFDYG[j][kg] + BXZGD*DFDZG[j][kg];
+				bddfjy = BYXGD*DFDXG[j][kg] + BYYGD*DFDYG[j][kg] + BYZGD*DFDZG[j][kg];
+				bddfjz = BZXGD*DFDXG[j][kg] + BZYGD*DFDYG[j][kg] + BZZGD*DFDZG[j][kg];
+				eddfj = EXGD*DFDXG[j][kg] + EYGD*DFDYG[j][kg] + EZGD*DFDZG[j][kg];
 				for (int i = 0; i < 8; i++)
 				{
-					BTRANE[j][i] = BTRANE[j][i] + DFDXG[kg][i] * bddfjx + DFDYG[kg][i] * bddfjy + DFDZG[kg][i] * bddfjz;
-					DTRANE[j][i] = DTRANE[j][i] + eddfj*W[kg][i];
+					BTRANE[i][j] = BTRANE[i][j] + DFDXG[i][kg] * bddfjx + DFDYG[i][kg] * bddfjy + DFDZG[i][kg] * bddfjz;
+					DTRANE[i][j] = DTRANE[i][j] + eddfj*W[i][kg];
 				}
 			}
 		}
@@ -4263,7 +4249,7 @@ void Storage::NODAL()
 			double SWRHON = node_swt[i] * node_rho[i];
 			if (ML != 2)
 			{
-				double afln = (1 - ISSFLO / 2) * (SWRHON * node_sop[i] + node_por[i] * node_rho[i] * node_swb[i] * (node_dswdp[i] + node_sw[i] * (1.0 - node_swb[i]) / (PSTAR + node_piter[i])))*node_vol[i] / (TMAX - TSTART);//DELTP;
+				double afln = (1 - ISSFLO / 2) * (SWRHON * node_sop[i] + node_por[i] * node_rho[i] * node_swb[i] * (node_dswdp[i] + node_sw[i] * (1.0 - node_swb[i]) / (PSTAR + node_piter[i])))*node_vol[i] / DELTP;
 				double cfln = node_por[i] * node_swt[i] * DRWDU*node_vol[i];
 				double dudt = (1 - ISSFLO / 2)*(node_um1[i] - node_um2[i]) / DLTUM1;
 				cfln = cfln * dudt - (node_sw[i] * GCONST*TEMP*node_por[i] * node_rho[i] * ((node_swb[i] * node_swb[i]) / (PSTAR + node_piter[i]))*(-0.5*PRODF1*(node_rho[i] * node_uiter[i] / SMWH)))*node_vol[i];
@@ -4388,7 +4374,7 @@ void Storage::BASIS3_Simple( int L, double XLOC, double YLOC, double ZLOC, doubl
 	}
 	for (int i = 0; i < 9; i++)
 		CJ[i] = 0.0;
-
+	//double * tmpCJ = new double[9]{};
 	for (int il = 0; il < 8; il++)
 	{
 		int ii = L * 8 + il;
@@ -5647,3 +5633,23 @@ else
 std::cout << "Unable to open file";
 
 */
+
+void Storage::transpose(double mat[8][8])
+{
+	// only for square matrices
+	double tmp = 0;
+	for (int i = 0; i < 8; i++)
+	{
+		for (int j = 0; j < 8; j++)
+		{
+			if (i == j)
+				break;
+
+			tmp = mat[i][j];
+			mat[i][j] = mat[j][i];
+			mat[j][i] = tmp;
+
+		}
+	}
+
+}

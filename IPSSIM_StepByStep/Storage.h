@@ -60,6 +60,9 @@ public:
 	void set_transport_type_string(std::vector<char> str){ transport_type_string = str; }
 	void set_simulation_condition_string(std::vector<char> str){ simulation_condition_string = str; }
 	void set_simulation_start_string(std::vector<char> str){ simulation_start_string = str; }
+	void set_nl_across(std::vector<char> str){ nl_across = str; }
+	void set_nn_across(std::vector<char> str){ nn_across = str; }
+	void set_ne_across(std::vector<char> str){ ne_across = str; }
 	std::vector<char> get_sutra_string() const;
 	std::vector<char> get_version_string() const;
 	std::vector<char> get_version_num_string() const;
@@ -70,10 +73,13 @@ public:
 	std::vector<char> get_nn1_string() const;
 	std::vector<char> get_nn2_string() const;
 	std::vector<char> get_nn3_string() const;
-	std::vector<char> get_flow_type_string() const;;
-	std::vector<char> get_transport_type_string() const;;
-	std::vector<char> get_simulation_condition_string() const;;
-	std::vector<char> get_simulation_start_string() const;;
+	std::vector<char> get_nl_across() const;
+	std::vector<char> get_ne_across() const;
+	std::vector<char> get_nn_across() const;
+	std::vector<char> get_flow_type_string() const;
+	std::vector<char> get_transport_type_string() const;
+	std::vector<char> get_simulation_condition_string() const;
+	std::vector<char> get_simulation_start_string() const;
 	int get_nn() const;
 	void set_nn(int nn);
 	int get_ne() const;
@@ -231,6 +237,7 @@ public:
 	void set_u_ics_string(std::vector<char> str){ u_ics_string = str; }
 	void reserve_p_ics(){ p_ics.reserve(NN); };
 	void reserve_u_ics(){ u_ics.reserve(NN); };
+	void transpose(double mat[8][8]);
 	int FRCSTP(double time);
 	int FINDL3(int el_no,obsPoint& obs,double& xsi_,double& eta_,double& zet_);
 	void set_starting_time();
@@ -265,6 +272,9 @@ private:
 	std::vector<char> nn1_string;
 	std::vector<char> nn2_string;
 	std::vector<char> nn3_string;
+	std::vector<char> nl_across;
+	std::vector<char> ne_across;
+	std::vector<char> nn_across;
 	std::vector<char> flow_type_string;
 	std::vector<char> transport_type_string;
 	std::vector<char> simulation_condition_string;

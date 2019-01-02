@@ -166,5 +166,7 @@ void SimulationControl::run()
 	store->set_starting_time();
 	store->output_initial_starting_if_transient();
 	store->set_steady_state_switches();
+	t.reset();
 	store->simulation();
+	std::cout << t << " seconds for simulation" << std::endl;
 }
