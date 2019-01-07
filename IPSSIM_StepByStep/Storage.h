@@ -13,6 +13,8 @@ class Storage
 public:
 	static Storage * instance();
 	void BASIS3_Simple(int L, double XLOC, double YLOC, double ZLOC, double& DET, double CJ[]);
+	void BASIS2_Simple(int L, double XLOC, double YLOC, double& DET, double CJ[]);
+	std::vector<double> gauss(std::vector<std::vector<double>> A);
 	void outLST();
 	void outNOD();
 	void outELE();
@@ -24,16 +26,24 @@ public:
 		double * ALMAX, double * ALMID, double * ALMIN, double * ATMAX, double * ATMID, double * ATMIN,
 		double* dxx, double * dxy, double* dxz, double * dyx, double * dyy, double * dyz, double* dzx, double * dzy, double * dzz);
 	void GLOCOL(int L,double vole[],double bflowe[8][8],double dflowe[],double btrane[8][8],double dtrane[8][8]);
+	void GLOBAN(int L, double vole[], double bflowe[8][8], double dflowe[], double btrane[8][8], double dtrane[8][8]);
+	void GLOCOL2(int L, double vole[], double bflowe[4][4], double dflowe[], double btrane[4][4], double dtrane[4][4]);
+	void GLOBAN2(int L, double vole[], double bflowe[4][4], double dflowe[], double btrane[4][4], double dtrane[4][4]);
 	void BCTIME();
 	void BCSTEP();
 	void ADSORB();
 	void ELEMN3();
 	void NODAL();
 	void BC();
+	void wConsolex(const char* s, WORD color,bool end);
 	void ROTATE(std::vector<double>& vec, double& v1, double& v2, double& v3, std::vector<double>& out_vec);
 	void BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, double F[],double W[], double& DET,double CJ[],
 		double DFDXG[],double DFDYG[],double DFDZG[],double DWDXG[],double DWDYG[],double DWDZG[],double & swbg,double& relkbg,
 		double & vxg,double&vyg,double & vzg,double & vgmag,double& swtg,double&relktg,double &viscg,double & rhog,double &rgxg,double&rgyg,double&rgzg,double &porg);
+	void BASIS2(int ICALL, int L, double XLOC, double YLOC, double F[], double W[], double& DET, double CJ[],double& THICKG,
+		double DFDXG[], double DFDYG[], double DWDXG[], double DWDYG[], double & swbg, double& relkbg,
+		double & vxg, double&vyg, double & vgmag, double& swtg, double&relktg, double &viscg, double & rhog, double &rgxg, double&rgyg, double &porg);
+
 	void ELEMN2();
 	void set_bcs_defined(bool v){ bcs_defined = v; }
 	bool get_bcs_defined()const { return bcs_defined; }
@@ -45,6 +55,7 @@ public:
 	void check_data_sets();
 	void set_steady_state_switches();
 	void init_a_val(double * vec, int ssize, double val){ for (int i = 0; i < ssize; i++) vec[i] = val; }
+	void init_a_val(std::vector<std::vector<double>>& vec, int ssize, double val);
 	std::string getTittle(int index);
 	void set_sutra_string(std::vector<char> str){ sutra_string = str; }
 	void set_version_string(std::vector<char> str){ version_string = str; }
@@ -238,6 +249,7 @@ public:
 	void reserve_p_ics(){ p_ics.reserve(NN); };
 	void reserve_u_ics(){ u_ics.reserve(NN); };
 	void transpose(double mat[8][8]);
+	void transpose(double mat[4][4]);
 	int FRCSTP(double time);
 	int FINDL3(int el_no,obsPoint& obs,double& xsi_,double& eta_,double& zet_);
 	void set_starting_time();
@@ -582,6 +594,8 @@ private:
 	int * IBCUBC;
 	int * IBCSOP;
 	int * IBCSOU;
+	std::vector<std::vector<double>> direct_PMAT;
+	std::vector<std::vector<double>> direct_UMAT;
 	std::vector<std::vector<int>> node_neighbors;
 	std::vector<double> QPLITR;
 	std::vector<double> GNUP1;

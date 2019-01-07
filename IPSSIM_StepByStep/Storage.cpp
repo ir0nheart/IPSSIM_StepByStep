@@ -9,15 +9,35 @@
 #include "Writer.h"
 #include "BinaryOut.h"
 Storage * Storage::m_pInstance = nullptr;
+enum Colors{
+	BLACK = 0,
+	NAVY = 1,
+	DARK_GREEN = 2,
+	DARK_CYAN = 3,
+	DARK_RED = 4,
+	DARK_PINK = 5,
+	DARK_YELLOW = 6,
+	LIGHT_GRAY = 7,
+	DARK_GRAY = 8,
+	BRIGHT_BLUE = 9,
+	BRIGHT_GREEN = 10,
+	BRIGHT_CYAN = 11,
+	BRIGHT_RED = 12,
+	BRIGHT_PINK = 13,
+	BRIGHT_YELLOW = 14,
+	BRIGHT_WHITE = 15
+};
+
 std::string Storage::K5SYM[] = { "N", "X", "Y", "Z", "P", "U", "S", "ES", "RU" };
 std::string Storage::K6SYM[] = { "E","X","Y","Z","VX","VY","VZ" };
 std::string Storage::VARNK5[] = { "NODE NUMBER", "X-COORDINATE", "Y-COORDINATE", "Z-COORDINATE", "PRESSURE", "CONCENTRATION", "SATURATION", "EFFECTIVE STRESS", "STRESS RATIO" };
 std::string Storage::VARNK6[] = { "ELEMENT NUMBER", "X-COORDINATE OF CENTROID", "Y-COORDINATE OF CENTROID", "Z-COORDINATE OF CENTROID", "X-VELOCITY", "Y-VELOCITY", "Z-VELOCITY" };
 int Storage::J6COL[] = {0,0,0,0,0,0,0};
-std::string Storage::LCOL[] = { "" };
+//std::string Storage::LCOL[] = { "" };
 int Storage::J5COL[] = {0,0,0,0,0,0,0,0,0};
 //std::string Storage::NCOL[] = { "Node","X","Y","Z","Pressure","Concentration","Saturation","Eff. Stress","Stress Rat." };
 std::string Storage::NCOL[] = { "X", "Y", "Z", "Pressure", "Concentration", "Saturation" };
+std::string Storage::LCOL[] = { "X origin", "Y origin", "Z origin", "X velocity", "Y velocity", "Z velocity" };
 template<typename MatrixT, typename VectorT>
 struct monitor_user_data
 {
@@ -1224,7 +1244,7 @@ void Storage::check_data_sets()
 			int ctr = 0;
 			for (int j = 0; j < NTMAX; j++)
 			{
-				if (ctr == NTCYC && j > 1)
+				if ((ctr == NTCYC || j%NTCYC==0) && j > 0)
 				{
 					dtime = dtime*TCMULT;
 					ctr = 0;
@@ -1682,6 +1702,22 @@ void Storage::check_data_sets()
 	} else
 	{
 		//2D Nodes
+		NRTEST = 1;
+		Timer tt;
+		for (int j = 0; j < nodeData.size(); j++)
+		{
+
+			node_num[j] = std::stoi(strtok(nodeData[j].data(), " "));
+			node_nreg[j] = std::stoi(strtok(NULL, " "));
+			node_x[j] = std::stod(strtok(NULL, " "));
+			node_y[j] = std::stod(strtok(NULL, " "));
+			node_z[j] = std::stod(strtok(NULL, " "));
+			node_por[j] = std::stod(strtok(NULL, " "));
+			if (node_nreg[j] != NROLD)
+				NRTEST++;
+			NROLD = node_nreg[j];
+		}
+		std::cout << tt << "seconds for nodes" << std::endl;
 	}
 
 	if (KTYPE[0] == 3){
@@ -1698,6 +1734,14 @@ void Storage::check_data_sets()
 	else
 	{
 		//2D Nodes
+		for (int j = 0; j < nodeData.size(); j++)
+		{
+			node_x[j] = node_x[j] * SCALX;
+			node_y[j] = node_y[j] * SCALY;
+			node_z[j] = node_z[j] * SCALZ;
+			node_por[j] = node_por[j] * PORFAC;
+			node_sop[j] = (1.0 - node_por[j])*COMPMA + node_por[j] * COMPFL;
+		}
 	}
 
 
@@ -1823,15 +1867,19 @@ void Storage::check_data_sets()
 	for (int i = 0; i < NCOLS5; i++)
 	{
 		bool found = false;
+		std::string str(node_output_headers[i].begin(), node_output_headers[i].end());
+		if (str == "-")
+			break;
 		for (int j = 0; j < 9; j++)
 		{
-			if (std::string(node_output_headers[i].begin(),node_output_headers[i].end()) == K5SYM[j])
+		
+			if (str == K5SYM[j])
 			{
 				if (j == 0 && i != 0)
 				{
 					SimulationControl::exitOnError("INP-8B-1");
 				}
-				if (j == 4 && KTYPE[0] == 2)
+				if (j == 3 && KTYPE[0] == 2)
 				{
 					SimulationControl::exitOnError("INP-8B-2");
 				}
@@ -1860,17 +1908,24 @@ void Storage::check_data_sets()
 	for (int i = 0; i < LCOLS6; i++)
 	{
 		bool found = false;
+		std::string str(element_output_headers[i].begin(), element_output_headers[i].end());
+		if (str == "-")
+			break;
 		for (int j = 0; j < 7; j++)
 		{
-			if (std::string(element_output_headers[i].begin(), element_output_headers[i].end()) == K6SYM[j])
+			if (str == K6SYM[j])
 			{
 				if (j == 0 && i != 0)
 				{
 					SimulationControl::exitOnError("INP-8C-1");
 				}
-				if (j == 4 && KTYPE[0] == 2)
+				if (j == 3 && KTYPE[0] == 2)
 				{
 					SimulationControl::exitOnError("INP-8C-2");
+				}
+				if (j == 6 && KTYPE[0] == 2)
+				{
+					SimulationControl::exitOnError("INP-8C-4");
 				}
 				J6COL[i] = j;
 				found = true;
@@ -1900,16 +1955,31 @@ void Storage::check_data_sets()
 	NOBS = NOBSN - 1;
 	NOBCYC = -1;
 	{ std::string obs_nam,obs_sch,obs_fmt;
-	double obs_x, obs_y, obs_z;
-		for (std::vector<std::vector<char>> str : obsData)
+		double obs_x, obs_y, obs_z;
+		obs_z = 0;
+		if (KTYPE[0] == 3){
+			for (std::vector<std::vector<char>> str : obsData)
+			{
+				obs_nam = std::string(str[0].begin(), str[0].end());
+				obs_x = std::stod(std::string(str[1].begin(), str[1].end()));
+				obs_y = std::stod(std::string(str[2].begin(), str[2].end()));
+				obs_z = std::stod(std::string(str[3].begin(), str[3].end()));
+				obs_sch = std::string(str[4].begin(), str[4].end());
+				obs_fmt = std::string(str[5].begin(), str[5].end());
+				obsContainer.push_back(obsPoint(obs_nam, obs_x, obs_y, obs_z, obs_sch, obs_fmt));
+			}
+		} else
 		{
-			obs_nam = std::string(str[0].begin(),str[0].end());
-			obs_x = std::stod(std::string(str[1].begin(), str[1].end()));
-			obs_y = std::stod(std::string(str[2].begin(), str[2].end()));
-			obs_z = std::stod(std::string(str[3].begin(), str[3].end()));
-			obs_sch = std::string(str[4].begin(), str[4].end());
-			obs_fmt = std::string(str[5].begin(), str[5].end());
-			obsContainer.push_back(obsPoint(obs_nam, obs_x, obs_y, obs_z, obs_sch, obs_fmt));
+			for (std::vector<std::vector<char>> str : obsData)
+			{
+				obs_nam = std::string(str[0].begin(), str[0].end());
+				obs_x = std::stod(std::string(str[1].begin(), str[1].end()));
+				obs_y = std::stod(std::string(str[2].begin(), str[2].end()));
+				//obs_z = std::stod(std::string(str[3].begin(), str[3].end()));
+				obs_sch = std::string(str[3].begin(), str[3].end());
+				obs_fmt = std::string(str[4].begin(), str[4].end());
+				obsContainer.push_back(obsPoint(obs_nam, obs_x, obs_y, obs_z, obs_sch, obs_fmt));
+			}
 		}
 	}
 
@@ -2150,7 +2220,13 @@ void Storage::check_data_sets()
 		ATMNF = std::stod(std::string(element_props[12].begin(), element_props[12].end()));
 	} else
 	{
-		
+		PMAXFA = std::stod(std::string(element_props[1].begin(), element_props[1].end()));
+		PMINFA = std::stod(std::string(element_props[2].begin(), element_props[2].end()));
+		ANG1FA = std::stod(std::string(element_props[3].begin(), element_props[3].end()));
+		ALMAXF = std::stod(std::string(element_props[4].begin(), element_props[4].end()));
+		ALMINF = std::stod(std::string(element_props[5].begin(), element_props[5].end()));
+		ATMXF = std::stod(std::string(element_props[6].begin(), element_props[6].end()));
+		ATMNF = std::stod(std::string(element_props[7].begin(), element_props[7].end()));
 	}
 	
 	//Create Elements
@@ -2158,27 +2234,8 @@ void Storage::check_data_sets()
 	allocate_element_arrays();
 	Timer t;
 	if (KTYPE[0] == 3){
-		/*int el_num;
-		int lreg;
-		double pmax, pmid, pmin, ang1, ang2, ang3, almax, almid, almin, atmax, atmin, atmid;*/
-		
 		for (int j = 0; j < elementData.size();j++)
 		{
-			//str.push_back('\0');
-	/*		el_num = std::stoi(strtok(elementData[j].data(), " "));
-			lreg = std::stoi(strtok(NULL, " "));
-			pmax = std::stod(strtok(NULL, " "))*PMAXFA;
-			pmid = std::stod(strtok(NULL, " "))*PMIDFA;
-			pmin = std::stod(strtok(NULL, " "))*PMINFA;
-			ang1 = std::stod(strtok(NULL, " "))*ANG1FA;
-			ang2 = std::stod(strtok(NULL, " "))*ANG2FA;
-			ang3 = std::stod(strtok(NULL, " "))*ANG3FA;
-			almax = std::stod(strtok(NULL, " "))*ALMAXF;
-			almid = std::stod(strtok(NULL, " "))*ALMIDF;
-			almin = std::stod(strtok(NULL, " "))*ALMINF;
-			atmax = std::stod(strtok(NULL, " "))*ATMXF;
-			atmid = std::stod(strtok(NULL, " "))*ATMDF;
-			atmin = std::stod(strtok(NULL, " "))*ATMNF;*/
 			el_num[j] = std::stoi(strtok(elementData[j].data(), " "));
 			el_lreg[j] = std::stoi(strtok(NULL, " "));
 			el_pmax[j] = std::stod(strtok(NULL, " "));
@@ -2193,13 +2250,23 @@ void Storage::check_data_sets()
 			el_atmax[j] = std::stod(strtok(NULL, " "));
 			el_atmid[j] = std::stod(strtok(NULL, " "));
 			el_atmin[j] = std::stod(strtok(NULL, " "));
-		
-		//	elementContainer.push_back(Element(&el_num[j],&el_lreg[j],&el_pmax[j],&el_pmid[j],&el_pmin[j],&el_ang1[j],&el_ang2[j],&el_ang3[j],&el_almax[j],&el_almid[j],&el_almin[j],&el_atmax[j],&el_atmid[j],&el_atmin[j]));
 		}
 	}
 	else
 	{
 		//2D Nodes
+		for (int j = 0; j < elementData.size(); j++)
+		{
+			el_num[j] = std::stoi(strtok(elementData[j].data(), " "));
+			el_lreg[j] = std::stoi(strtok(NULL, " "));
+			el_pmax[j] = std::stod(strtok(NULL, " "));
+			el_pmin[j] = std::stod(strtok(NULL, " "));
+			el_ang1[j] = std::stod(strtok(NULL, " "));
+			el_almax[j] = std::stod(strtok(NULL, " "));
+			el_almin[j] = std::stod(strtok(NULL, " "));
+			el_atmax[j] = std::stod(strtok(NULL, " "));
+			el_atmin[j] = std::stod(strtok(NULL, " "));
+		}
 	}
 
 	if (KTYPE[0] == 3){
@@ -2250,6 +2317,47 @@ void Storage::check_data_sets()
 		}
 		delete[] el_pmax;
 		delete[] el_pmid;
+		delete[] el_pmin;
+	} 
+	else if (KTYPE[0] == 2){
+		for (int j = 0; j < NE; j++)
+			el_pmax[j] = el_pmax[j] * PMAXFA;
+		for (int j = 0; j < NE; j++)
+			el_pmin[j] = el_pmin[j] * PMINFA;
+
+		for (int j = 0; j < NE; j++)
+			el_ang1[j] = el_ang1[j] * ANG1FA;
+		
+
+		for (int j = 0; j < NE; j++)
+			el_atmax[j] = el_atmax[j] * ATMXF;
+		for (int j = 0; j < NE; j++)
+			el_atmin[j] = el_atmin[j] * ATMNF;
+
+		for (int j = 0; j < NE; j++)
+			el_almax[j] = el_almax[j] * ALMAXF;
+		for (int j = 0; j < NE; j++)
+			el_almin[j] = el_almin[j] * ALMINF;
+
+		for (int j = 0; j < NE; j++)
+			el_pangl1[j] = el_ang1[j] * D2R;
+
+		delete[] el_ang1;
+
+		for (int j = 0; j < NE; j++)
+		{
+			double radiax = el_ang1[j] * 0.01745329;
+			double sina = sin(radiax);
+			double cosa = cos(radiax);
+			double sina2 = sina*sina;
+			double cosa2 = cosa*cosa;
+			el_permxx[j] = el_pmax[j] * cosa2 + el_pmin[j] * sina2;
+			el_permyy[j] = el_pmax[j] * sina2 + el_pmin[j] * cosa2;
+			el_permxy[j] = (el_pmax[j] - el_pmin[j])*sina*cosa;
+			el_permyx[j] = el_permxy[j];
+			el_pangl1[j] = radiax;
+		}
+		delete[] el_pmax;
 		delete[] el_pmin;
 	}
 
@@ -2621,7 +2729,7 @@ void Storage::check_data_sets()
 	if (NOBCYC != -1)
 	{
 		std::cout << "NOBCYC != 1, IPSSIM works with 2.2 DataSet" << std::endl;
-		SimulationControl::exitOnError();
+		//SimulationControl::exitOnError();
 	}
 
 	if (KTYPE[0] == 3){
@@ -2658,9 +2766,20 @@ void Storage::check_data_sets()
 		Timer t;
 		PTRSET();
 		std::cout << "PTR Set done in " << t << " seconds." << std::endl;
+	} else
+	{	
+		KSOLVP = KSOLVU = 0;
+		NELT = NN;
+	}
+	BANWID();
+
+	if (!strncmp(p_solver_string.data(), "DIRECT", p_solver_string.size()))
+	{
+		direct_PMAT.assign(NELT, std::vector<double>(NELT + 1, 0));
+		direct_UMAT.assign(NELT, std::vector<double>(NELT + 1, 0));
 	}
 
-	BANWID();
+
 	{ for (int i = 0; i <= ITMAX; i++){
 		ITBCS = i;
 		BCSTEP();
@@ -2668,7 +2787,7 @@ void Storage::check_data_sets()
 	}
 	{
 		ITRST = 0;
-		if (!strncmp(p_ics_string.data(), "'UNIFORM'", p_ics_string.size()))
+		if (!strncmp(p_ics_string.data(), "'UNIFORM'",9))
 		{
 			double PUNI = p_ics[0];
 			for (int i = 0; i < NN; i++)
@@ -2676,7 +2795,7 @@ void Storage::check_data_sets()
 				node_pvec[i]=PUNI;
 			}
 		}
-		else if (!strncmp(p_ics_string.data(), "'NONUNIFORM'", p_ics_string.size()))
+		else if (!strncmp(p_ics_string.data(), "'NONUNIFORM'", 12))
 		{
 			for (int i = 0; i < NN; i++)
 			{
@@ -2687,7 +2806,7 @@ void Storage::check_data_sets()
 			SimulationControl::exitOnError("ICS-2-1");
 		}
 
-		if (!strncmp(u_ics_string.data(), "'UNIFORM'", u_ics_string.size()))
+		if (!strncmp(u_ics_string.data(), "'UNIFORM'", 9))
 		{
 			double UUNI = u_ics[0];
 			for (int i = 0; i < NN; i++)
@@ -2695,7 +2814,7 @@ void Storage::check_data_sets()
 				node_uvec[i]=UUNI;
 			}
 		}
-		else if (!strncmp(u_ics_string.data(), "'NONUNIFORM'", u_ics_string.size()))
+		else if (!strncmp(u_ics_string.data(), "'NONUNIFORM'", 12))
 		{
 			for (int i = 0; i < NN; i++)
 			{
@@ -2748,7 +2867,7 @@ void Storage::check_data_sets()
 
 void Storage::allocate_element_arrays()
 {
-	if (KTYPE[0] == 3){
+	//if (KTYPE[0] == 3){
 		el_num = new int[NE];
 		el_lreg = new int[NE];
 		el_pmax = new double[NE];
@@ -2757,7 +2876,7 @@ void Storage::allocate_element_arrays()
 		el_ang1 = new double[NE];
 		el_ang2 = new double[NE];
 		el_ang3 = new double[NE];
-		el_pangl1 = new double[NE];
+		el_pangl1 = new double[NE]{};
 		el_pangl2 = new double[NE];
 		el_pangl3 = new double[NE];
 		el_almax = new double[NE];
@@ -2783,12 +2902,12 @@ void Storage::allocate_element_arrays()
 		el_gzet = std::vector<std::vector<double>>(NE, std::vector<double>(N48, 0));
 		el_det = std::vector<std::vector<double>>(NE, std::vector<double>(N48, 0));
 		elementContainer.reserve(NE);
-	}
+	//}
 }
 void Storage::allocate_node_arrays()
 {
-	if (KTYPE[0] == 3)
-	{
+	/*if (KTYPE[0] == 3)
+	{*/
 		node_num = new int[NN];
 		node_nreg = new int[NN];
 		node_x = new double[NN];
@@ -2834,13 +2953,13 @@ void Storage::allocate_node_arrays()
 		node_relk = new double[NN]{};
 		node_relkt = new double[NN]{};
 		node_neighbors = std::vector<std::vector<int>>(NN, std::vector<int>());
-	}
+	//}
 }
 
 void Storage::de_allocate_node_arrays()
 { 
-	if (KTYPE[0] == 3)
-	{
+	//if (KTYPE[0] == 3)
+	//{
 		delete[] node_num;
 		delete[] node_x;
 		delete[] node_y;
@@ -2862,7 +2981,7 @@ void Storage::de_allocate_node_arrays()
 		delete[] node_relkt;
 		delete[] node_relkb;
 		delete[] node_relk;
-	}
+	//}
 }
 
 
@@ -3050,7 +3169,8 @@ void Storage::output_initial_starting_if_transient()
 
 		if (ISSFLO == 0)
 		{
-			outNOD();
+			//outNOD();
+			//outOBS();
 		}
 	}
 }
@@ -3162,11 +3282,24 @@ void Storage::simulation()
 
 	if (ISSTRA != 0)
 	{
-		std::cout << "TIME STEP " << IT << " OF " << ITMAX << std::endl;
+		wConsolex("TIME STEP ", BRIGHT_GREEN,0);
+		wConsolex(std::to_string(IT).c_str(), BRIGHT_CYAN, 0);
+		wConsolex(" OF ", BRIGHT_GREEN, 0);
+		wConsolex(std::to_string(ITMAX).c_str(), BRIGHT_CYAN, 1);
+		//std::cout << "TIME STEP " << IT << " OF " << ITMAX << std::endl;
 	} else
 	{
 		TELAPS = TSEC - TSTART;
-		std::cout << "TIME STEP " << IT << " OF " << ITMAX << " ; ELAPSED TIME " << TELAPS << " OF " << TEMAX << " [s]" << std::endl;
+		wConsolex("TIME STEP ", BRIGHT_GREEN, 0);
+		wConsolex(std::to_string(IT).c_str(), BRIGHT_CYAN, 0);
+		wConsolex(" OF ", BRIGHT_GREEN, 0);
+		wConsolex(std::to_string(ITMAX).c_str(), BRIGHT_CYAN, 0);
+		wConsolex(" ; ELAPSED TIME ", BRIGHT_GREEN, 0);
+		wConsolex(std::to_string(TELAPS).c_str(), BRIGHT_PINK, 0);
+		wConsolex(" OF ", BRIGHT_GREEN, 0);
+		wConsolex(std::to_string(TEMAX).c_str(), BRIGHT_PINK, 0);
+		wConsolex(" [s] ", BRIGHT_GREEN, 1);
+		//std::cout << "TIME STEP " << IT << " OF " << ITMAX << " ; ELAPSED TIME " << TELAPS << " OF " << TEMAX << " [s]" << std::endl;
 	}
 
 	if (ML == 0)
@@ -3312,22 +3445,32 @@ BEGIN_ITERATION:
 	// ZERO OUT ARRAYS
 	if (ML <= 1)
 	{
-		init_a_val(PMAT, NELT, 0.0);
+		if (KSOLVP)
+			init_a_val(PMAT, NELT, 0.0);
+		else
+			init_a_val(direct_PMAT, NELT, 0);
+
 		init_a_val(node_p_rhs, NN, 0.0);
 		init_a_val(node_vol, NN, 0.0);
 		if (ML != 1)
 		{
 			if (NOUMAT <= 1)
-			{
+			{	
+				if (KSOLVU)
 				init_a_val(UMAT, NELT, 0.0);
+				else
+				init_a_val(direct_UMAT, NELT, 0);
 			}
 			init_a_val(node_u_rhs, NN, 0.0);
 		}
 	} else
 	{
 		if (NOUMAT <= 1)
-		{
+		{ 
+			if (KSOLVU)
 			init_a_val(UMAT, NELT, 0.0);
+			else
+			init_a_val(direct_UMAT, NELT, 0);
 		}
 		init_a_val(node_u_rhs, NN, 0.0);
 	}
@@ -3362,110 +3505,79 @@ BEGIN_ITERATION:
 
 		BC();
 
-		std::string f_file = "p_vec";
-		f_file.append(std::to_string(IT));
-		f_file.append(".bin");
-		std::ofstream outpvecbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
-		double rhsSize = (double)NN;
-		outpvecbin.write(reinterpret_cast < const char*>(&rhsSize), sizeof(double));
-		for (int i = 0; i < NN; i++)
-			outpvecbin.write(reinterpret_cast < const char*>(&node_p_rhs[0] + i), sizeof(double));
-		outpvecbin.close();
+		int resultp, resultu;
+		resultp = resultu = 0;
 
-		f_file = "u_vec";
-		f_file.append(std::to_string(IT));
-		f_file.append(".bin");
-		std::ofstream outuvecbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
-		outpvecbin.write(reinterpret_cast < const char*>(&rhsSize), sizeof(double));
-		for (int i = 0; i < NN; i++)
-			outuvecbin.write(reinterpret_cast < const char*>(&node_u_rhs[0] + i), sizeof(double));
-		outuvecbin.close();
-
-		f_file = "u_MAT";
-		f_file.append(std::to_string(IT));
-		f_file.append(".bin");
-		std::ofstream outumatbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
-		double nNelt = (double)NELT;
-			outumatbin.write(reinterpret_cast < const char*>(&nNelt), sizeof(double));
-		for (int i = 0; i < NELT; i++)
-			outumatbin.write(reinterpret_cast < const char*>(&UMAT[0] + i), sizeof(double));
-		outumatbin.close();
-
-		f_file = "p_MAT";
-		f_file.append(std::to_string(IT));
-		f_file.append(".bin");
-		std::ofstream outpmatbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
-		outpmatbin.write(reinterpret_cast < const char*>(&nNelt), sizeof(double));
-		for (int i = 0; i < NELT; i++)
-			outpmatbin.write(reinterpret_cast < const char*>(&PMAT[0] + i), sizeof(double));
-		outpmatbin.close();
-
-		if (!ONCEP)
-		{
-			f_file = "IA";
-			f_file.append(std::to_string(IT));
-			f_file.append(".bin");
-			int IAsize = (int)IA.size();
-			std::ofstream outiabin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
-			outiabin.write(reinterpret_cast < const char*>(&IAsize), sizeof(int));
-			for (int i = 0; i < IAsize; i++)
-				outiabin.write(reinterpret_cast < const char*>(&IA[0] + i), sizeof(int));
-			outiabin.close();
-			f_file = "JA";
-			f_file.append(std::to_string(IT));
-			f_file.append(".bin");
-			int JAsize = (int)JA.size();
-			std::ofstream outjabin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
-			outjabin.write(reinterpret_cast < const char*>(&JAsize), sizeof(int));
-			for (int i = 0; i < JAsize; i++)
-				outjabin.write(reinterpret_cast < const char*>(&JA[0] + i), sizeof(int));
-			outjabin.close();
-		}
-		
-		double pnorm = DNRM2(NN, node_p_rhs, 1);
-		if (pnorm == 0)
-		{
+		if (!KSOLVP){
+			std::vector<double> x(NN);
 			for (int i = 0; i < NN; i++)
-				node_p_solution[i] = 0.0;
-			std::cout << " P solution inferred from Matrix equation. No solver called." << std::endl;
-		} else
-		{
-			CompCol_Mat_double A;
-			A.newsize(NN, NN, NELT);
-			for (int i = 0; i < NELT; i++)
 			{
-				A.val(i) = PMAT[i];
-				A.row_ind(i) = IA[i];
+				direct_PMAT[i][NN] = node_p_rhs[i];
 			}
-			for (int i = 0; i < NN + 1; i++)
-				A.col_ptr(i) = JA[i];
-
-			VECTOR_double b(NN,0), x(A.dim(1), 0.0);
-			//b.newsize(NN);
+			wConsolex("\t Starting P-Solution using", BRIGHT_BLUE, 0);
+			wConsolex(" DIRECT", BRIGHT_RED, 0);
+			wConsolex(" solver...", BRIGHT_BLUE, 1);
+			x = gauss(direct_PMAT);
 			for (int i = 0; i < NN; i++)
-				b(i) = node_p_rhs[i];
-			int restart = 20, result, it = 2000;
-			MATRIX_double H(restart + 1, restart, 0.0);
-			CompCol_ILUPreconditioner_double M(A);
-			double tol = 1.e-13;
-			std::cout << "\tStarting P - Solution using GMRES solver..." << std::endl;
-			result = GMRES(A, x, b, M, H, restart, it, tol);
-			
-			if (!result)
-			{
-				ONCEP = true;
-				std::cout << "\tP - Solution Converged in " << it << " iterations  (Error ~ " << tol << " )" << std::endl;
-			}
-				
-			for (int i = 0; i < NN; i++)
-				node_p_solution[i] = x(i);
-
-			//std::cout << " GMRES flag " << result << std::endl;
-			//std::cout << "iterations performed : " << it << std::endl;
-			//std::cout << "tolerance achieved : " << tol << std::endl;
-			//std::cout << "done " << std::endl;
+				node_p_solution[i] = x[i];
 		}
+		else{
+			double pnorm = DNRM2(NN, node_p_rhs, 1);
+			if (pnorm == 0)
+			{
+				for (int i = 0; i < NN; i++)
+					node_p_solution[i] = 0.0;
+				std::cout << " P solution inferred from Matrix equation. No solver called." << std::endl;
+			}
+			else
+			{
+				CompCol_Mat_double A;
+				A.newsize(NN, NN, NELT);
+				for (int i = 0; i < NELT; i++)
+				{
+					A.val(i) = PMAT[i];
+					A.row_ind(i) = IA[i];
+				}
+				for (int i = 0; i < NN + 1; i++)
+					A.col_ptr(i) = JA[i];
 
+				VECTOR_double b(NN, 0), x(A.dim(1), 0.0);
+				//b.newsize(NN);
+				for (int i = 0; i < NN; i++)
+					b(i) = node_p_rhs[i];
+				int restart = 20, it = max_p_iterations;
+				MATRIX_double H(restart + 1, restart, 0.0);
+				CompCol_ILUPreconditioner_double M(A);
+				ICPreconditioner_double IC(A);
+				double tol = p_tolerance;
+				wConsolex("\t Starting ", BRIGHT_BLUE, 0);
+				wConsolex("P", BRIGHT_RED, 0);
+				wConsolex(" - Solution using ", BRIGHT_BLUE, 0);
+				wConsolex(std::string(p_solver_string.begin(),p_solver_string.end()).c_str(), BRIGHT_RED, 0);
+				wConsolex(" solver...", BRIGHT_BLUE, 1);
+				//std::cout << "\tStarting P - Solution using GMRES solver..." << std::endl;
+				if (!strncmp(p_solver_string.data(), "GMRES", p_solver_string.size()))
+				resultp = GMRES(A, x, b, M, H, restart, it, tol);
+				else
+				resultp = CG(A, x, b, IC, it, tol);
+				//CG();
+				if (!resultp)
+				{
+					ONCEP = true;
+					//std::cout << "\tP - Solution Converged in " << it << " iterations  (Error ~ " << tol << " )" << std::endl;
+					char buff[100];
+					_snprintf(buff, 100, "%1.5E", tol);
+					wConsolex("\t P - Solution Converged in ", BRIGHT_BLUE, 0);
+					wConsolex(std::to_string(it).c_str(), BRIGHT_RED, 0);
+					wConsolex(" solver iterations (Error ~ ", BRIGHT_BLUE, 0);
+					wConsolex(buff, BRIGHT_RED, 0);
+					wConsolex(")", BRIGHT_BLUE, 1);
+				}
+
+				for (int i = 0; i < NN; i++)
+					node_p_solution[i] = x(i);
+			}
+		}
 		if (ISSFLO != 0)
 		{
 			for (int i = 0; i < NN; i++)
@@ -3475,13 +3587,28 @@ BEGIN_ITERATION:
 		if (ML != 1)
 		{
 			//if (NOUMAT)
+			if (!KSOLVU)
+			{
+				std::vector<double> x(NN);
+				for (int i = 0; i < NN; i++)
+				{
+					direct_UMAT[i][NN] = node_u_rhs[i];
+				}
+				wConsolex("\t Starting U-Solution using", BRIGHT_BLUE, 0);
+				wConsolex(" DIRECT", BRIGHT_RED, 0);
+				wConsolex(" solver...", BRIGHT_BLUE, 1);
+				x = gauss(direct_UMAT);
+				for (int i = 0; i < NN; i++)
+					node_u_solution[i] = x[i];
+			}else{
 			double unorm = DNRM2(NN, node_u_rhs, 1);
 			if (unorm == 0)
 			{
 				for (int i = 0; i < NN; i++)
 					node_u_solution[i] = 0.0;
 				std::cout << "\tU Solution inferred from matrix equation" << std::endl;
-			} else
+			}
+			else
 			{
 				CompCol_Mat_double A;
 				A.newsize(NN, NN, NELT);
@@ -3497,24 +3624,35 @@ BEGIN_ITERATION:
 				b.newsize(NN);
 				for (int i = 0; i < NN; i++)
 					b(i) = node_u_rhs[i];
-				int restart = 32,result,it=1600;
+				int restart = 32, it = max_u_iterations;
 				MATRIX_double H(restart + 1, restart, 0.0);
 				CompCol_ILUPreconditioner_double M(A);
-				double tol = 1.e-13;
-				std::cout << "\tStarting U - Solution using GMRES solver..." << std::endl;
-				result = GMRES(A, x, b, M, H, restart, it, tol);
-				if (!result)
+				double tol = u_tolerance;
+				//std::cout << "\tStarting U - Solution using GMRES solver..." << std::endl;
+
+				wConsolex("\t Starting ", BRIGHT_BLUE, 0);
+				wConsolex("U", BRIGHT_RED, 0);
+				wConsolex(" - Solution using ", BRIGHT_BLUE, 0);
+				wConsolex(std::string(u_solver_string.begin(), u_solver_string.end()).c_str(), BRIGHT_RED, 0);
+				wConsolex(" solver...", BRIGHT_BLUE, 1);
+				//std::cout << "\tStarting P - Solution using GMRES solver..." << std::endl;
+				if (!strncmp(u_solver_string.data(), "GMRES", u_solver_string.size()))
+				resultu = GMRES(A, x, b, M, H, restart, it, tol);
+				if (!resultu)
 				{
-					std::cout << "\tU - Solution Converged in " << it << " iterations  (Error ~ " << tol << " )" << std::endl;
+					//std::cout << "\tU - Solution Converged in " << it << " iterations  (Error ~ " << tol << " )" << std::endl;
+					char buff[100];
+					_snprintf(buff, 100, "%1.5E", tol);
+					wConsolex("\t U - Solution Converged in ", BRIGHT_BLUE, 0);
+					wConsolex(std::to_string(it).c_str(), BRIGHT_RED, 0);
+					wConsolex(" solver iterations (Error ~ ", BRIGHT_BLUE, 0);
+					wConsolex(buff, BRIGHT_RED, 0);
+					wConsolex(")", BRIGHT_BLUE, 1);
 				}
 				for (int i = 0; i < NN; i++)
 					node_u_solution[i] = x(i);
-
-				/*std::cout << " GMRES flag " << result << std::endl;
-				std::cout << "iterations performed : " << it << std::endl;
-				std::cout << "tolerance achieved : " << tol << std::endl;
-				std::cout << "done " << std::endl;*/
 			}
+		}
 		}
 
 	/*	for (int i = 0; i < NN; i++)
@@ -3549,10 +3687,25 @@ BEGIN_ITERATION:
 			node_pvec[i] = node_p_solution[i];
 			node_uvec[i] = node_u_solution[i];
 		}
+
+		int IERR = abs(resultp) + abs(resultu);
+
+
+
 		if (IT == ITMAX)
 			ISTOP = 1;
+
+			//PRNK5 = ((PRNDEF.OR.((IT.NE.0).AND.(MOD(IT,NCOLPR).EQ.0))          SUTRA........59200
+		//1.OR.((ITREL.EQ.1).AND.(NCOLPR.GT.0))).AND.(K5.NE. - 1))
+		NCOLPR = node_output_every;
+		//if (((IT != 0) && (IT % NCOLPR == 0)) || (ITREL == 1 && NCOLPR >0))
+		//	outNOD();
+		LCOLPR = element_output_every;
+		//if (((IT != 0) && (IT % LCOLPR == 0)) || (ITREL == 1 && LCOLPR > 0))
+		//	outELE();
+
 		if (ISTOP == 0)
-		goto BEGIN_TIMESTEP;
+			goto BEGIN_TIMESTEP;
 
 		// END OF SIMULATION DEALLOCATE ARRAYS AND SAY BB :D
 		std::cout << "END OF SIMULATION " << std::endl;
@@ -3657,17 +3810,7 @@ void Storage::BCSTEP()
 
 		if ((bcs->getNumberOfQINC() + bcs->getNumberOfQUINC()) > 0)
 		{
-			/*double * qin1 = new double[NN];
-			double * uin1 = new double[NN];
-			double * quin1 = new double[NN];
-			double * iqsop1 = new double[NSOP1];
-			double * iqsou1 = new double[NSOU1];
-			
-			delete[] qin1;
-			delete[] uin1;
-			delete[] quin1;
-			delete[] iqsop1;
-			delete[] iqsou1;*/
+	
 			for (int i = 0; i < NSOPI1; i++)
 			{
 				int IQP = -1;
@@ -3735,15 +3878,6 @@ void Storage::BCSTEP()
 
 		if (NBCN1 - 1 != 0)
 		{
-		/*	double * IPBC1 = new double[NBCN1];
-			double * PBC1 = new double[NBCN1];
-			double * IUBC1 = new double[NBCN1];
-			double * UBC1 = new double[NBCN1];
-
-			delete[] IPBC1;
-			delete[] PBC1;
-			delete[] IUBC1;
-			delete[] UBC1;*/
 			for (int i = 0; i < bcs->getNumberOfPBC(); i++)
 			{
 				int IP = -1;
@@ -3955,7 +4089,7 @@ void Storage::ELEMN3()
 				aysum = aysum + vyg[i];
 				azsum = azsum + vzg[i];
 			}
-			el_vmag[l] = sqrt(axsum*axsum + aysum + aysum + azsum + azsum);
+			el_vmag[l] = sqrt(axsum*axsum + aysum*aysum + azsum*azsum);
 			if (el_vmag[l] != 0.0)
 			{
 				el_vang2[l] = asin(azsum / el_vmag[l]) *57.29577951308232;
@@ -4183,7 +4317,7 @@ void Storage::ELEMN3()
 		send:
 			if (KSOLVP == 0)
 			{
-				
+				GLOBAN(l, vole, bflowe, dflowe, BTRANE, DTRANE);
 			} else
 			{
 				GLOCOL(l,vole,bflowe,dflowe,BTRANE,DTRANE);
@@ -4193,7 +4327,377 @@ void Storage::ELEMN3()
 
 void Storage::ELEMN2()
 {
-	
+	int ivcalc, jvcalc, kvcalc;
+	ivcalc = jvcalc = kvcalc = 0;
+	if ((ML != 2) && (ITER == 1))
+		ivcalc = 1;
+	if (IT == 1) ivcalc = 1;
+	if ((KVEL == 1))
+		jvcalc = 1;
+
+	kvcalc = ivcalc + jvcalc;
+
+	if (INTIM)
+	{
+		INTIM = false;
+		for (int i = 0; i < NE; i++)
+		{
+			double  DET[4];
+			for (int j = 0; j < N48; j++)
+			{
+				double xloc = GXLOC[j];
+				double yloc = GYLOC[j];
+				double CJ[4] = { 0, 0, 0, 0 };
+				BASIS2_Simple(i, xloc, yloc, DET[j], CJ);
+				el_gxsi[i][j] = CJ[0] * GRAVX + CJ[1] * GRAVY;
+				el_geta[i][j] = CJ[2] * GRAVX + CJ[3] * GRAVY;
+				
+				if (DET[j] <= 0)
+				{
+					ISTOP = ISTOP + 1;
+					std::cout << "Determinant of the jacobian at node " << (incidenceContainer[i]).second[j] << " in element "
+						<< i + 1 << " is negative or zero " << DET[j] << std::endl;
+				}
+			}
+		}
+	}
+
+	if (ISTOP != 0)
+	{
+		SimulationControl::exitOnError("INP-14B,22-1");
+	}
+
+	if (IUNSAT != 0)
+		IUNSAT = 2;
+	// Main Element Loop
+	double XIX, YIY;
+	int kgx;
+	double F[4][4];
+	double W[4][4];
+	double CJ[4]{};
+	double DET[4];
+	double THICKG[4]{};
+	double DWDXG[4][4];
+	double DWDYG[4][4];	
+	double DFDXG[4][4];
+	double DFDYG[4][4];
+	double swbg[4];
+	double relkbg[4];
+	double swtg[4];
+	double viscg[4];
+	double rhog[4];
+	double relktg[4];
+	double rgxg[4], rgyg[4];
+	double vole[4], dflowe[4], bflowe[4][4];
+	double vxgg[4], vygg[4], vgmag[4];
+	double porg[4];
+	double RXXG[4], RXYG[4], RYXG[4], RYYG[4];
+	double EXG[4], EYG[4];
+	double bxxg[4], bxyg[4];
+	double byxg[4], byyg[4];
+	double BTRANE[4][4];
+	double DTRANE[4][4];
+	double rddfjx, rddfjy;
+	double xloc, yloc;
+	double axsum, aysum;
+	double SWTEST;
+	double dxxg, dxyg, dyxg, dyyg;
+	double eswg, rhocwg, esrcg;
+	double bddfjx, bddfjy, eddfj;
+	double rxxgd, rxygd, ryxgd, ryygd;
+	double rdrx, rdry;
+
+	double BXXGD, BXYGD, BYXGD, BYYGD;
+	double EXGD, EYGD;
+	std::vector<double>vxg(4, 0);
+	std::vector<double>vyg(4, 0);
+	for (int l = 0; l < NE; l++){
+		XIX = YIY = -1.0;
+		kgx = 0;
+			for (int iyl = 0; iyl < 2; iyl++){
+				for (int ixl = 0; ixl < 2; ixl++)
+				{
+					xloc = XIX * GLOC;
+					yloc = YIY * GLOC;
+					
+					BASIS2(1, l, xloc, yloc, F[kgx], W[kgx], DET[kgx], CJ,THICKG[kgx], DFDXG[kgx], DFDYG[kgx],
+						DWDXG[kgx], DWDYG[kgx], swbg[kgx], relkbg[kgx], vxgg[kgx], vygg[kgx], vgmag[kgx], swtg[kgx], relktg[kgx], viscg[kgx], rhog[kgx], rgxg[kgx], rgyg[kgx], porg[kgx]);
+					XIX = -XIX;
+					kgx++;
+				}
+				YIY = -YIY;
+			}
+		
+			for (int t = 0; t < 4; t++){
+				vxg[t] = vxgg[t];
+				vyg[t] = vygg[t];
+			}
+		// Transpose Matrices for indice compatibility of SUTRA
+
+		transpose(F);
+		transpose(W);
+		transpose(DFDXG);
+		transpose(DFDYG);		
+		transpose(DWDXG);
+		transpose(DWDYG);
+		
+
+		//calculate velocity at element centroid
+		if (kvcalc - 2 == 0)
+		{
+
+			axsum = aysum  = 0.0;
+			for (int i = 0; i < 4; i++)
+			{
+				axsum = axsum + vxg[i];
+				aysum = aysum + vyg[i];
+				
+			}
+			el_vmag[l] = sqrt(axsum*axsum + aysum*aysum );
+			if (el_vmag[l] != 0.0)
+			{
+				el_vmag[l] = el_vmag[l] * 0.25;
+				el_vang1[l] = atan2(aysum, axsum)*57.29577951308232;
+			}
+			else
+			{
+				el_vang1[l] = 0.0;
+			}
+
+		}
+
+		//include node thicknesses
+		for (int i = 0; i < 4; i++)
+			DET[i] = THICKG[i] * DET[i];
+
+		// calculate parameters for fluid mass balance at gauss points
+
+		if (ML == 2)
+			goto u_only;
+
+		SWTEST = 0.0;
+
+		for (int i = 0; i < 4; i++)
+		{
+			SWTEST = SWTEST + swtg[i];
+			double ROMG = rhog[i] * relktg[i] / viscg[i];
+			RXXG[i] = el_permxx[l] * ROMG;
+			RXYG[i] = el_permxy[l] * ROMG;
+			
+			RYXG[i] = el_permyx[l] * ROMG;
+			RYYG[i] = el_permyy[l] * ROMG;
+			
+		}
+
+		// integrate fluid mass balance in an unsaturated element using asymetric weighting functions
+		if (UP <= 1e-6)
+			goto symmetric;
+
+		if (SWTEST - 3.999 >= 0)
+			goto symmetric;
+
+		for (int i = 0; i < 4; i++)
+		{
+			vole[i] = 0.0;
+			dflowe[i] = 0.0;
+			for (int j = 0; j < 4; j++)
+			{
+				bflowe[i][j] = 0.0;
+			}
+		}
+
+		for (int kg = 0; kg < 4; kg++)
+		{
+			rxxgd = RXXG[kg] * DET[kg];
+			rxygd = RXYG[kg] * DET[kg];
+			
+			ryxgd = RYXG[kg] * DET[kg];
+			ryygd = RYYG[kg] * DET[kg];
+			
+			rdrx = rxxgd*rgxg[kg] + rxygd*rgyg[kg];
+			rdry = ryxgd*rgxg[kg] + ryygd*rgyg[kg];
+			
+			for (int i = 0; i < 4; i++)
+			{
+				vole[i] = vole[i] + F[i][kg] * DET[kg];
+				dflowe[i] = dflowe[i] + rdrx*DWDXG[i][kg] + rdry*DWDYG[i][kg] ;
+			}
+
+			for (int j = 0; j < 4; j++)
+			{
+
+				rddfjx = rxxgd*DFDXG[j][kg] + rxygd*DFDYG[j][kg];
+				rddfjy = ryxgd*DFDXG[j][kg] + ryygd*DFDYG[j][kg];
+				
+				for (int p = 0; p < 4; p++){
+					bflowe[p][j] = bflowe[p][j] + DWDXG[p][kg] * rddfjx + DWDYG[p][kg] * rddfjy;
+				}
+			}
+		}
+		goto check;
+
+	symmetric:
+
+		for (int i = 0; i < 4; i++)
+		{
+			vole[i] = 0.0;
+			dflowe[i] = 0.0;
+			for (int j = 0; j < 4; j++)
+			{
+				bflowe[i][j] = 0.0;
+			}
+		}
+		for (int kg = 0; kg < 4; kg++)
+		{
+			rxxgd = RXXG[kg] * DET[kg];
+			rxygd = RXYG[kg] * DET[kg];
+			
+			ryxgd = RYXG[kg] * DET[kg];
+			ryygd = RYYG[kg] * DET[kg];
+			
+			rdrx = rxxgd*rgxg[kg] + rxygd*rgyg[kg];
+			rdry = ryxgd*rgxg[kg] + ryygd*rgyg[kg];
+			for (int i = 0; i < 4; i++)
+			{
+
+				vole[i] = vole[i] + F[i][kg] * DET[kg];
+				dflowe[i] = dflowe[i] + rdrx*DFDXG[i][kg] + rdry*DFDYG[i][kg];
+			}
+
+			for (int j = 0; j < 4; j++)
+			{
+
+				rddfjx = rxxgd*DFDXG[j][kg] + rxygd*DFDYG[j][kg];
+				rddfjy = ryxgd*DFDXG[j][kg] + ryygd*DFDYG[j][kg];
+				
+				for (int p = 0; p < 8; p++)
+				{
+
+					bflowe[p][j] = bflowe[p][j] + DFDXG[p][kg] * rddfjx + DFDYG[p][kg] * rddfjy;
+				}
+
+			}
+		}
+
+	check:
+		if (ML == 1)
+			goto send;
+	u_only:
+		if (NOUMAT == 1)
+			goto send;
+
+		// calculate parameters for energy balanca or solute mass balance at gauss points
+
+
+
+		//add difusion and dispersion terms to total dispersion tensor
+		for (int kg = 0; kg < 4; kg++)
+		{
+			eswg = porg[kg] * swtg[kg];
+			rhocwg = rhog[kg] * CW;
+			esrcg = eswg * rhocwg;
+			if (vgmag[kg] <= 0)
+			{
+				EXG[kg] = 0.0;
+				EYG[kg] = 0.0;
+				
+				dxxg = dxyg =  dyxg = dyyg = 0.0;
+
+			}
+			else
+			{
+				EXG[kg] = esrcg*vxg[kg];
+				EYG[kg] = esrcg*vyg[kg];
+				
+				//DISPERSIVITIES FOR 2D MODEL
+
+				double VANGG = 1.570796327;
+				if (vxg[kg] * vxg[kg] > 0.0)
+					VANGG = atan(vyg[kg] / vxg[kg]);
+				double VKANGG = VANGG - el_pangl1[l];
+				double dco = cos(VKANGG);
+				double dsi = sin(VKANGG);
+				double ALEFF = 0.0;
+				double DLG = 0.0;
+				if (el_almax[l] + el_almin[l] > 0)
+					ALEFF = el_almax[l] * el_almin[l] / (el_almin[l] * dco*dco + dsi*dsi*el_almax[l]);
+				DLG = ALEFF*vgmag[kg];
+				double ATEFF = 0.0;
+				double DTG = 0.0;
+				if (el_almax[l] + el_almin[l] > 0)
+					ATEFF = el_atmax[l] * el_atmin[l] / (el_atmax[l] * dco*dco + dsi*dsi*el_atmin[l]);
+				DTG = ATEFF*vgmag[kg];
+
+				double vxvg = vxg[kg] / vgmag[kg];
+				double vyvg = vyg[kg] / vgmag[kg];
+				double vxvg2 = vxvg*vxvg;
+				double vyvg2 = vyvg*vyvg;
+
+				//DISPERSION TENSOR
+				dxxg = DLG *vxvg2 + DTG*vyvg2;
+				dyyg = DTG *vxvg2 + DLG*vyvg2;
+				dxyg = (DLG - DTG)*vxvg*vyvg;
+				dyxg = dxyg;
+			}
+			double ESE;
+			if (ME == 1)
+				ESE = eswg*SIGMAW + (1.0 - porg[kg])*SIGMAS;
+			else
+				ESE = esrcg*SIGMAW + (1.0 - porg[kg])*rhocwg*SIGMAS;
+
+			bxxg[kg] = esrcg*dxxg + ESE;
+			bxyg[kg] = esrcg*dxyg;
+			
+			byxg[kg] = esrcg*dyxg;
+			byyg[kg] = esrcg*dyyg + ESE;
+			
+			
+
+		}
+
+		for (int i = 0; i < 4; i++){
+			for (int j = 0; j < 4; j++)
+			{
+				BTRANE[i][j] = 0.0;
+				DTRANE[i][j] = 0.0;
+			}
+		}
+
+		for (int kg = 0; kg < 4; kg++)
+		{
+			BXXGD = bxxg[kg] * DET[kg];
+			BXYGD = bxyg[kg] * DET[kg];
+			
+			BYXGD = byxg[kg] * DET[kg];
+			BYYGD = byyg[kg] * DET[kg];
+			
+			EXGD = EXG[kg] * DET[kg];
+			EYGD = EYG[kg] * DET[kg];
+			
+			for (int j = 0; j < 4; j++)
+			{
+
+				bddfjx = BXXGD*DFDXG[j][kg] + BXYGD*DFDYG[j][kg];
+				bddfjy = BYXGD*DFDXG[j][kg] + BYYGD*DFDYG[j][kg];
+				eddfj = EXGD*DFDXG[j][kg] + EYGD*DFDYG[j][kg];
+				for (int i = 0; i < 4; i++)
+				{
+					BTRANE[i][j] = BTRANE[i][j] + DFDXG[i][kg] * bddfjx + DFDYG[i][kg] * bddfjy;
+					DTRANE[i][j] = DTRANE[i][j] + eddfj*W[i][kg];
+				}
+			}
+		}
+
+	send:
+		if (KSOLVP == 0)
+		{
+			GLOBAN2(l, vole, bflowe, dflowe, BTRANE, DTRANE);
+		}
+		else
+		{
+			GLOCOL2(l, vole, bflowe, dflowe, BTRANE, DTRANE);
+		}
+	}
 }
 
 void Storage::NODAL()
@@ -4253,7 +4757,10 @@ void Storage::NODAL()
 				double cfln = node_por[i] * node_swt[i] * DRWDU*node_vol[i];
 				double dudt = (1 - ISSFLO / 2)*(node_um1[i] - node_um2[i]) / DLTUM1;
 				cfln = cfln * dudt - (node_sw[i] * GCONST*TEMP*node_por[i] * node_rho[i] * ((node_swb[i] * node_swb[i]) / (PSTAR + node_piter[i]))*(-0.5*PRODF1*(node_rho[i] * node_uiter[i] / SMWH)))*node_vol[i];
-				PMAT[IMID] = PMAT[IMID] + afln;
+				if (KSOLVP != 0)
+					PMAT[IMID] = PMAT[IMID] + afln;
+				else
+					direct_PMAT[IMID][IMID] = direct_PMAT[IMID][IMID] + afln;
 				node_p_rhs[i] = node_p_rhs[i] - cfln + afln * node_pm1[i] + node_qin[i];
 			}
 			if (ML == 1)
@@ -4269,13 +4776,17 @@ void Storage::NODAL()
 			double qur = 0.0;
 			double qul = 0.0;
 
-			if (node_qinitr[i]<1)
+			if (node_qinitr[i]>0)
 			{
 				qul = -CW*node_qinitr[i];
 				qur = -qul*node_uin[i];
 			}
-			if (NOUMAT != 1)
-				UMAT[IMID] = UMAT[IMID] + atrn - gtrn - gsltrn - qul;
+			if (NOUMAT != 1){
+				if (KSOLVU !=0)
+					UMAT[IMID] = UMAT[IMID] + atrn - gtrn - gsltrn - qul;
+				else
+					direct_UMAT[IMID][IMID] = direct_UMAT[IMID][IMID] + atrn - gtrn - gsltrn - qul;
+			}
 			node_u_rhs[i] = node_u_rhs[i] + atrn*node_um1[i] + etrn + gsrtrn + qur + node_quin[i];
 		}
 
@@ -4304,8 +4815,11 @@ void Storage::BC()
 				if (ML < 2)
 				{
 					double gpinl = -GNUP1[ip];
-					double gpinr = GNUP1[ip] * node_pbc[ip];
-					PMAT[IMID] = PMAT[IMID] - gpinl;
+					double gpinr = GNUP1[ip] * node_pbc[i];
+					if (KSOLVP)
+						PMAT[IMID] = PMAT[IMID] - gpinl;
+					else
+						direct_PMAT[IMID][IMID] = direct_PMAT[IMID][IMID] - gpinl;
 					node_p_rhs[i] = node_p_rhs[i] + gpinr;
 				}
 				if (ML == 1)
@@ -4316,10 +4830,14 @@ void Storage::BC()
 				if (QPLITR[ip] > 0)
 				{
 					gul = -CW*QPLITR[ip];
-					gur = -gul*node_ubc[ip];
+					gur = -gul*node_ubc[i];
 				}
-				if (NOUMAT != 1)
-					UMAT[IMID] = UMAT[IMID] - gul;
+				if (NOUMAT != 1){
+					if (KSOLVU)
+						UMAT[IMID] = UMAT[IMID] - gul;
+					else
+						direct_UMAT[IMID][IMID] = direct_UMAT[IMID][IMID] - gul;
+				}
 				node_u_rhs[i] = node_u_rhs[i] + gur;
 			}
 		}
@@ -4341,9 +4859,12 @@ void Storage::BC()
 				if (NOUMAT != 1)
 				{
 					double GUINL = -GNUU1[ip];
-					UMAT[IMID] = UMAT[IMID] - GUINL;
+					if (KSOLVU)
+						UMAT[IMID] = UMAT[IMID] - GUINL;
+					else
+						direct_UMAT[IMID][IMID] = direct_UMAT[IMID][IMID] - GUINL;
 				}
-				double guinr = GNUU1[ip] * node_ubc[ip];
+				double guinr = GNUU1[ip] * node_ubc[i];
 				node_u_rhs[i] = node_u_rhs[i] + guinr;
 			}
 		}
@@ -4397,6 +4918,46 @@ void Storage::BASIS3_Simple( int L, double XLOC, double YLOC, double ZLOC, doubl
 	DET = CJ[0] * (CJ[4] * CJ[8] - CJ[7] * CJ[5]) - CJ[3] * (CJ[1] * CJ[8] - CJ[7] * CJ[2]) +
 		CJ[6] * (CJ[1] * CJ[5] - CJ[4] * CJ[2]);
 }
+
+void Storage::BASIS2_Simple(int L, double XLOC, double YLOC, double& DET, double CJ[])
+{
+	double XIIX[4] = { -1.0, +1.0, +1.0, -1.0 };
+	double YIIY[4] = { -1.0, -1.0, +1.0, +1.0 };
+
+	double XF[2] = { 1.0 - XLOC, 1.0 + XLOC };
+	double YF[2] = { 1.0 - YLOC, 1.0 + YLOC };
+
+	double FX[4] = { XF[0], XF[1], XF[1], XF[0] };
+	double FY[4] = { YF[0], YF[0], YF[1], YF[1] };
+	
+	double DFDXL[4]{};
+	double DFDYL[4]{};
+	
+
+	for (int i = 0; i < 4; i++)
+	{
+		DFDXL[i] = XIIX[i] * 0.25 * FY[i];
+		DFDYL[i] = YIIY[i] * 0.25 * FX[i];
+		
+	}
+	for (int i = 0; i < 4; i++)
+		CJ[i] = 0.0;
+	//double * tmpCJ = new double[9]{};
+	for (int il = 0; il < 4; il++)
+	{
+		int ii = L * 4 + il;
+		int i = incidence_vector[ii];
+		i = i - 1;
+		CJ[0] = CJ[0] + DFDXL[il] * node_x[i];
+		CJ[1] = CJ[1] + DFDXL[il] * node_y[i];
+
+		CJ[2] = CJ[2] + DFDYL[il] * node_x[i];
+		CJ[3] = CJ[3] + DFDYL[il] * node_y[i];
+
+	}
+	DET = CJ[0] * CJ[3] - CJ[1] * CJ[2];
+}
+
 void Storage::BASIS3(int ICALL, int L, double XLOC, double YLOC, double ZLOC, double F[],double W[], double& DET, double CJ[],
 	double DFDXG[],double DFDYG[],double DFDZG[],double DWDXG[],double DWDYG[],double DWDZG[],double& swbg,double& relkbg,
 	double &vxg,double & vyg,double&vzg,double&vgmag,double& swtg,double&relktg,double &viscg,double& rhog,double&rgxg,double&rgyg,double&rgzg,double& porg)
@@ -5019,6 +5580,100 @@ void Storage::GLOCOL(int L, double vole[], double bflowe[8][8], double dflowe[],
 	}
 }
 
+
+void Storage::GLOCOL2(int L, double vole[], double bflowe[4][4], double dflowe[], double btrane[4][4], double dtrane[4][4])
+{
+	int n1 = L*N48;
+	int n8 = n1 + N48;
+
+	if (ML == 2)
+		goto u_only;
+	int ie = 0;
+	int m = -1;
+	for (int i = n1; i < n8; i++)
+	{
+
+		int ib = incidence_vector[i];
+		ib = ib - 1;
+
+		node_vol[ib] = node_vol[ib] + vole[ie];
+		node_p_rhs[ib] = node_p_rhs[ib] + dflowe[ie];
+		int je = 0;
+		for (int j = n1; j < n8; j++)
+		{
+			int jb = incidence_vector[j];
+			jb = jb - 1;
+			int mbeg = JA[jb];
+			int mend = JA[jb + 1];
+			bool found = false;
+			for (int mm = mbeg; mm < mend; mm++)
+			{
+				if (ib == IA[mm])
+				{
+					m = mm;
+					found = true;
+					break;
+				}
+			}
+			if (found)
+			{
+				if (m != -1)
+					PMAT[m] = PMAT[m] + bflowe[ie][je];
+				else
+					SimulationControl::exitOnError(" m negative");
+			}
+
+			je++;
+		}
+
+
+
+		ie++;
+	}
+
+	if (ML == 1)
+		return;
+
+u_only:
+	if (NOUMAT != 1)
+	{
+		ie = 0;
+		for (int i = n1; i < n8; i++)
+		{
+			int ib = incidence_vector[i];
+			ib = ib - 1;
+			int je = 0;
+			for (int j = n1; j < n8; j++)
+			{
+				int jb = incidence_vector[j];
+				jb = jb - 1;
+				int mbeg = JA[jb];
+				int mend = JA[jb + 1];
+				bool found = false;
+				for (int mm = mbeg; mm < mend; mm++)
+				{
+					if (ib == IA[mm])
+					{
+						m = mm;
+						found = true;
+						break;
+					}
+				}
+				if (found)
+				{
+					if (m != -1)
+						UMAT[m] = UMAT[m] + dtrane[ie][je] + btrane[ie][je];
+					else
+						SimulationControl::exitOnError(" m negative");
+				}
+				je++;
+			}
+
+			ie++;
+		}
+	}
+}
+
 double Storage::DNRM2(int N, double * X, int INCX)
 {
 	double NORM, SSQ, SCALE;
@@ -5305,16 +5960,16 @@ void Storage::outELE()
 			else{ CTYPE2 = "REGULAR MESH"; }
 
 			if (KTYPE[0] == 3){ // 3D
-				_snprintf(buff, sizeof(buff), "## %1d-D,", KTYPE[0]);
+				_snprintf(buff, sizeof(buff), "## %1d-D, ", KTYPE[0]);
 				logLine.append(buff + CTYPE2);
-				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NN1, NN2, NN3, NN, NE);
+				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d)*(%9d) = %9d Elems ( %9d Nodes)\n", NN1-1, NN2-1, NN3-1, NE, NN);
 				logLine.append(buff);
 				logLine.append("## \n");
 			}
 			else{ // 2D
-				_snprintf(buff, sizeof(buff), "## %1d-D,", KTYPE[0]);
+				_snprintf(buff, sizeof(buff), "## %1d-D, ", KTYPE[0]);
 				logLine.append(buff + CTYPE2);
-				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NN1, NN2, NN, NE);
+				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Elems ( %9d Nodes)\n", NN1-1, NN2-1, NE, NN);
 				logLine.append(buff);
 				logLine.append("## \n");
 
@@ -5330,7 +5985,7 @@ void Storage::outELE()
 			logLine.append("## \n");
 		}
 		else{
-			_snprintf(buff, sizeof(buff), "## % 1d - D, IRREGULAR MESH", KTYPE[0]);
+			_snprintf(buff, sizeof(buff), "## %1d-D, IRREGULAR MESH", KTYPE[0]);
 			logLine.append(buff);
 			logLine.append(std::string(40, ' '));
 			_snprintf(buff, sizeof(buff), "%9d Nodes ( %9d Elems)\n", NN, NE);
@@ -5339,7 +5994,7 @@ void Storage::outELE()
 		}
 
 		logLine.append("## " + std::string(92, '=') + "\n## VELOCITY RESULTS" + std::string(48, ' '));
-		_snprintf(buff, 1024, "%9d Time steps printed\n", KTPRN);
+		_snprintf(buff, 1024, "%9d Time steps printed\n", ITT.size()-1);
 		logLine.append(buff);
 		logLine.append("## " + std::string(92, '=') + "\n## \n");
 		logLine.append("##     Time steps" + std::string(22, ' ') + "[Printed? / Time step on which V is based]\n");
@@ -5347,7 +6002,7 @@ void Storage::outELE()
 		logLine.append("##  " + std::string(14, '-') + "   " + std::string(13, '-') + "    " + std::string(12, '-') + "   " + std::string(12, '-') + "   " + std::string(12, '-')+"\n");
 		for (int i = 1; i <= KTMAX; i++){
 			if (ITT[i] >= ITRST){
-				_snprintf(buff, sizeof(buff), "##        %8d    %+13.6e      %c %8d     %c %8d     %c %8d\n", ITT[i], TT[i],CPVX, ISVEL[i],CPVY,ISVEL[i],CPVZ,ISVEL[i]);
+				_snprintf(buff, sizeof(buff), "##        %8d    %+13.6e    %c %8d     %c %8d     %c %8d\n", ITT[i], TT[i],CPVX, ISVEL[i],CPVY,ISVEL[i],CPVZ,ISVEL[i]);
 				logLine.append(buff);
 			}
 		}
@@ -5357,7 +6012,58 @@ void Storage::outELE()
 	if ((ISSFLO == 2) && (IT > 1))
 		return;
 
+	if (IT == 1 && ISSTRA == 1)
+	{
+		DURN = 0.0;
+		TOUT = TSTART;
+	} else
+	{
+		DURN = DELT;
+		TOUT = TSEC;
+	}
+	logLine.append("## \n");
+	logLine.append("## " + std::string(98, '=') + "\n");
+	_snprintf(buff, sizeof(buff), "## TIME STEP %8d", IT);
+	logLine.append(buff + std::string(26, ' '));
+	_snprintf(buff, sizeof(buff), "Duration: %+11.4e sec      Time: %+11.4e sec\n", DURN, TOUT);
+	logLine.append(buff);
+	logLine.append("## " + std::string(98, '=') + "\n");
 
+	//if (NCOL[0] == "'N'"){ // printNodeNumber
+	logLine.append("##");
+	for (std::string a : LCOL){
+		int fil = 14 - a.length();
+		logLine.append(std::string(fil, ' ') + a +" " );
+	}
+
+	
+	double rn48 = 1.0 / N48;
+	for (int i = 0; i < NE; i++){
+		double cntrx, cntry, cntrz;
+		cntrx = cntry = cntrz = 0;
+		for (int j = 0; j < N48; j++)
+		{
+			int iii = j + i*N48;
+			int kkk = incidence_vector[iii] - 1;
+			cntrx = cntrx + node_x[kkk];
+			cntry = cntry + node_y[kkk];
+			cntrz = cntrz + node_z[kkk];
+		}
+		cntrx = cntrx * rn48;
+		cntry = cntry * rn48;
+		cntrz = cntrz * rn48;
+		double va1 = 0.017453292*el_vang1[i];
+		int LL = min(i, NEX - 1);
+		double va2 = 0.017453292*el_vang2[LL] * (KTYPE[0] - 2);
+		double cva2 = cos(va2);
+		double VECTRX = el_vmag[i]*cos(va1)*cva2; 
+		double VECTRY = el_vmag[i] * sin(va1)*cva2;
+		double VECTRZ = el_vmag[i] * sin(va2);
+
+		_snprintf(buff, sizeof(buff), "\n  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e", cntrx,cntry,cntrz,VECTRX,VECTRY,VECTRZ);
+		logLine.append(buff);
+	}
+	logWriter->add_line(logLine);
 }
 void Storage::outNOD()
 {
@@ -5489,14 +6195,14 @@ void Storage::outNOD()
 			else{ CTYPE2 = "REGULAR MESH"; }
 
 			if (KTYPE[0] == 3){ // 3D
-				_snprintf(buff, sizeof(buff), "## %1d-D,", KTYPE[0]);
+				_snprintf(buff, sizeof(buff), "## %1d-D, ", KTYPE[0]);
 				logLine.append(buff + CTYPE2);
 				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NN1, NN2, NN3, NN, NE);
 				logLine.append(buff);
 				logLine.append("## \n");
 			}
 			else{ // 2D
-				_snprintf(buff, sizeof(buff), "## %1d-D,", KTYPE[0]);
+				_snprintf(buff, sizeof(buff), "## %1d-D, ", KTYPE[0]);
 				logLine.append(buff + CTYPE2);
 				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NN1, NN2, NN, NE);
 				logLine.append(buff);
@@ -5514,7 +6220,7 @@ void Storage::outNOD()
 			logLine.append("## \n");
 		}
 		else{
-			_snprintf(buff, sizeof(buff), "## % 1d - D, IRREGULAR MESH", KTYPE[0]);
+			_snprintf(buff, sizeof(buff), "## %1d-D, IRREGULAR MESH", KTYPE[0]);
 			logLine.append(buff);
 			logLine.append(std::string(40, ' '));
 			_snprintf(buff, sizeof(buff), "%9d Nodes ( %9d Elems)\n", NN, NE);
@@ -5535,7 +6241,7 @@ void Storage::outNOD()
 
 		for (int i = 1; i <= KTMAX; i++){
 			if (ITT[i] >= ITRST){
-				_snprintf(buff, sizeof(buff), "##        %8d    %+13.6e      %c %8d     %c %8d     %c %8d\n", ITT[i], TT[i], CPHORP, ISHORP[i], CPTORC, ISTORC[i], CPSATU, ISSATU[i]);
+				_snprintf(buff, sizeof(buff), "##        %8d    %+13.6e    %c %8d     %c %8d     %c %8d\n", ITT[i], TT[i], CPHORP, ISHORP[i], CPTORC, ISTORC[i], CPSATU, ISSATU[i]);
 				logLine.append(buff);
 			}
 		}
@@ -5563,24 +6269,18 @@ void Storage::outNOD()
 	logLine.append(buff);
 	logLine.append("## " + std::string(98, '=') + "\n");
 
-
-
-
-
-
-
 	//if (NCOL[0] == "'N'"){ // printNodeNumber
 	logLine.append("##");
 	for (std::string a : NCOL){
-		int fil = 15 - a.length();
-		logLine.append(std::string(fil, ' ') + a + "  ");
+		int fil = 14 - a.length();
+		logLine.append(std::string(fil, ' ') + a+" ");
 	}
 
-	logLine.append("\n");
+	
 
 	for (int i =0 ; i < NN; i++){
 
-		_snprintf(buff, sizeof(buff), "  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e\n", node_x[i],node_y[i],node_z[i],node_pvec[i],node_uvec[i],node_swt[i]);
+		_snprintf(buff, sizeof(buff), "\n  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e", node_x[i],node_y[i],node_z[i],node_pvec[i],node_uvec[i],node_swt[i]);
 		logLine.append(buff);
 	}
 
@@ -5590,7 +6290,17 @@ void Storage::outNOD()
 }
 void Storage::outOBS()
 {
+	std::string logLine = "";
+	Writer * logWriter = Writer::instance("OBS");
+	char buff[512];
+	for (obsPoint obs : obsContainer)
+	{
+		std::cout << obs.get_x() << std::endl;
+		std::cout << obs.get_y() << std::endl;
+		std::cout << obs.get_z() << std::endl;
 
+		std::cout << obs.get_element() << std::endl;
+	}
 }
 
 /*	std::ofstream outbin("p_rhs.bin", std::ios::binary);
@@ -5653,3 +6363,496 @@ void Storage::transpose(double mat[8][8])
 	}
 
 }
+
+void Storage::transpose(double mat[4][4])
+{
+	// only for square matrices
+	double tmp = 0;
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < 4; j++)
+		{
+			if (i == j)
+				break;
+
+			tmp = mat[i][j];
+			mat[i][j] = mat[j][i];
+			mat[j][i] = tmp;
+
+		}
+	}
+
+}
+
+std::vector<double> Storage::gauss(std::vector<std::vector<double>> A)
+{
+	int n = A.size();
+
+	for (int i = 0; i<n; i++) {
+		// Search for maximum in this column
+		double maxEl = abs(A[i][i]);
+		int maxRow = i;
+		for (int k = i + 1; k<n; k++) {
+			if (abs(A[k][i]) > maxEl) {
+				maxEl = abs(A[k][i]);
+				maxRow = k;
+			}
+		}
+
+		// Swap maximum row with current row (column by column)
+		for (int k = i; k<n + 1; k++) {
+			double tmp = A[maxRow][k];
+			A[maxRow][k] = A[i][k];
+			A[i][k] = tmp;
+		}
+
+		// Make all rows below this one 0 in current column
+		for (int k = i + 1; k<n; k++) {
+			double c = -A[k][i] / A[i][i];
+			for (int j = i; j<n + 1; j++) {
+				if (i == j) {
+					A[k][j] = 0;
+				}
+				else {
+					A[k][j] += c * A[i][j];
+				}
+			}
+		}
+	}
+
+	// Solve equation Ax=b for an upper triangular matrix A
+	std::vector<double> x(n);
+	for (int i = n - 1; i >= 0; i--) {
+		x[i] = A[i][n] / A[i][i];
+		for (int k = i - 1; k >= 0; k--) {
+			A[k][n] -= A[k][i] * x[i];
+		}
+	}
+	return x;
+}
+
+void Storage::init_a_val(std::vector<std::vector<double>>& vec, int ssize, double val)
+{
+	for (int i = 0; i < ssize; i++)
+		for (int j = 0; j < ssize; j++)
+			vec[i][j] = val;
+}
+
+
+void Storage::GLOBAN(int L, double vole[], double bflowe[8][8], double dflowe[], double btrane[8][8],
+	double dtrane[8][8])
+{
+	if (ML != 2)
+	{
+		int ib, jb;
+		ib = jb = 0;
+		int iii, jjj;
+		for (int i = 0; i < N48; i++)
+		{
+			iii = L * 8 + i;
+			ib = incidence_vector[iii] - 1;
+			node_vol[ib] = node_vol[ib] + vole[i];
+			node_p_rhs[ib] = node_p_rhs[ib] + dflowe[i];
+			for (int j = 0; j < N48; j++)
+			{
+				jjj = L * 8 + j;
+				jb = incidence_vector[jjj] - 1;
+				direct_PMAT[ib][jb] = direct_PMAT[ib][jb] + bflowe[i][j];
+			}
+		}
+	}
+
+
+	if (ML != 1)
+	{
+		if (NOUMAT != 1)
+		{
+			int ib, jb;
+			ib = jb = 0;
+			int iii, jjj;
+			for (int i = 0; i < N48; i++)
+			{
+				iii = L * 8 + i;
+				ib = incidence_vector[iii] - 1;
+				for (int j = 0; j < N48; j++)
+				{
+					jjj = L * 8 + j;
+					jb = incidence_vector[jjj] - 1;
+					direct_UMAT[ib][jb] = direct_UMAT[ib][jb] + btrane[i][j]+dtrane[i][j];
+				}
+			}
+		}
+
+	}
+}
+
+void Storage::GLOBAN2(int L, double vole[], double bflowe[4][4], double dflowe[], double btrane[4][4],
+	double dtrane[4][4])
+{
+	if (ML != 2)
+	{
+		int ib, jb;
+		ib = jb = 0;
+		int iii, jjj;
+		for (int i = 0; i < N48; i++)
+		{
+			iii = L * 4 + i;
+			ib = incidence_vector[iii] - 1;
+			node_vol[ib] = node_vol[ib] + vole[i];
+			node_p_rhs[ib] = node_p_rhs[ib] + dflowe[i];
+			for (int j = 0; j < N48; j++)
+			{
+				jjj = L * 4 + j;
+				jb = incidence_vector[jjj] - 1;
+				direct_PMAT[ib][jb] = direct_PMAT[ib][jb] + bflowe[i][j];
+			}
+		}
+	}
+
+
+	if (ML != 1)
+	{
+		if (NOUMAT != 1)
+		{
+			int ib, jb;
+			ib = jb = 0;
+			int iii, jjj;
+			for (int i = 0; i < N48; i++)
+			{
+				iii = L * 4 + i;
+				ib = incidence_vector[iii] - 1;
+				for (int j = 0; j < N48; j++)
+				{
+					jjj = L * 4 + j;
+					jb = incidence_vector[jjj] - 1;
+					direct_UMAT[ib][jb] = direct_UMAT[ib][jb] + btrane[i][j] + dtrane[i][j];
+				}
+			}
+		}
+
+	}
+}
+
+
+void Storage::wConsolex(const char* s, WORD color,bool end)
+{
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+	if (!end)
+		std::cout << s;
+	else
+		std::cout << s << std::endl;
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
+}
+
+
+void Storage::BASIS2(int ICALL, int L, double XLOC, double YLOC, double F[], double W[], double& DET, double CJ[],double& THICKG,
+	double DFDXG[], double DFDYG[], double DWDXG[], double DWDYG[], double& swbg, double& relkbg,
+	double &vxg, double& vyg, double&vgmag, double& swtg, double&relktg, double &viscg, double& rhog, double&rgxg, double&rgyg, double& porg)
+{
+	double XIIX[4] = { -1.0, +1.0, +1.0, -1.0 };
+	double YIIY[4] = { -1.0, -1.0, +1.0, +1.0 };
+	
+
+	double XF[2] = { 1.0 - XLOC, 1.0 + XLOC };
+	double YF[2] = { 1.0 - YLOC, 1.0 + YLOC };
+	
+
+	double FX[8] = { XF[0], XF[1], XF[1], XF[0] };
+	double FY[8] = { YF[0], YF[0], YF[1], YF[1] };
+	
+	double DFDXL[4]{};
+	double DFDYL[4]{};
+	
+	for (int i = 0; i < 4; i++)
+		F[i] = 0.25 *FX[i] * FY[i];
+
+	for (int i = 0; i < 4; i++)
+	{
+		DFDXL[i] = XIIX[i] * 0.25 * FY[i] ;
+		DFDYL[i] = YIIY[i] * 0.25 * FX[i] ;
+		
+	}
+
+	//std::vector<double> CJ(9, 0);
+	for (int i = 0; i < 4; i++)
+		CJ[i] = 0.0;
+
+	for (int il = 0; il < 4; il++)
+	{
+		int ii = L * 4 + il;
+		int i = incidence_vector[ii];
+		i = i - 1;
+		CJ[0] = CJ[0] + DFDXL[il] * node_x[i];
+		CJ[1] = CJ[1] + DFDXL[il] * node_y[i];
+		CJ[2] = CJ[2] + DFDYL[il] * node_x[i];
+		CJ[3] = CJ[3] + DFDYL[il] * node_y[i];
+		
+	}
+
+	DET = CJ[0] * CJ[3] - CJ[1] * CJ[2];
+	//cj = CJ;
+	if (ICALL == 0){
+		return;
+	}
+
+	double ODET = 1.0 / DET;
+	double CIJ[4] = { 0, 0, 0, 0 };
+
+	CIJ[0] = +ODET * CJ[3];
+	CIJ[1] = -ODET * CJ[1];
+	CIJ[2] = -ODET * CJ[2];
+	CIJ[3] = +ODET * CJ[0];
+	
+
+	// CALCULATE DERIVATIVES WRT TO GLOBAL COORDINATES
+	for (int i = 0; i < 4; i++)
+	{
+		DFDXG[i] = CIJ[0] * DFDXL[i] + CIJ[1] * DFDYL[i];
+		DFDYG[i] = CIJ[2] * DFDXL[i] + CIJ[3] * DFDYL[i];
+		
+	}
+
+	// Calculate consistent components of (RHO*GRAV) term in local coordinates
+	double RGXL, RGYL, RGXLM1, RGYLM1;
+	RGXL = RGYL  = RGXLM1 = RGYLM1 =  0;
+	for (int il = 0; il < 4; il++)
+	{
+		int ii = L * 4 + il;
+		int i = incidence_vector[ii];
+		i = i - 1;
+		double ADFDXL = abs(DFDXL[il]);
+		double ADFDYL = abs(DFDYL[il]);
+		
+		RGXL = RGXL + node_rcit[i] * el_gxsi[L][il] * ADFDXL;
+		RGYL = RGYL + node_rcit[i] * el_geta[L][il] * ADFDYL;
+		
+		RGXLM1 = RGXLM1 + node_rcitm1[i] * el_gxsi[L][il] * ADFDXL;
+		RGYLM1 = RGYLM1 + node_rcitm1[i] * el_geta[L][il] * ADFDYL;
+		
+	}
+
+	// transform consistent components to global coordinates
+	rgxg = CIJ[0] * RGXL + CIJ[1] * RGYL;
+	rgyg = CIJ[2] * RGXL + CIJ[3] * RGYL;
+	
+
+	double RGXGM1 = CIJ[0] * RGXLM1 + CIJ[1] * RGYLM1;
+	double RGYGM1 = CIJ[2] * RGXLM1 + CIJ[3] * RGYLM1;
+	
+
+	// calculate Parameter values at this location
+	double piterg, uiterg, dpdxg, dpdyg, cnubg,thickg;
+	piterg = uiterg = dpdxg = dpdyg = porg = cnubg =thickg= 0.0;
+	for (int il = 0; il < 4; il++)
+	{
+		int ii = L * 4 + il;
+		int i = incidence_vector[ii];
+		i = i - 1;
+		dpdxg = dpdxg + node_pvel[i] * DFDXG[il];
+		dpdyg = dpdyg + node_pvel[i] * DFDYG[il];
+		
+		porg = porg + node_por[i] * F[il];
+		thickg=thickg +node_z[i] *F[il];
+		piterg = piterg + node_piter[i] * F[il];
+		uiterg = uiterg + node_uiter[i] * F[il];
+		//cnubg = cnubg + node_cnub[i] * F[il];
+	}
+	THICKG = thickg;
+	// Set values for density and viscosity
+	rhog = RHOW0 + DRWDU*(uiterg - URHOW0);
+	viscg = 0;
+	if (ME == 1)
+	{
+		viscg = VISC0*239.4e-7*(pow(10.0, (248.37 / (uiterg + 133.15))));
+	}
+	else
+	{
+		viscg = VISC0;
+	}
+
+	// Set unsaturated flow parameters swg and relkg
+	double relkg, swg;
+	if (IUNSAT - 2 == 0)
+	{
+		if (piterg < 0)
+		{
+			std::cout << " unsaturated flow not implemented yet .." << std::endl;
+			SimulationControl::exitOnError();
+		}
+		else
+		{
+			swg = 1.0;
+			relkg = 1.0;
+		}
+	}
+	else
+	{
+		swg = 1.0;
+		relkg = 1.0;
+	}
+	BUBSAT(swbg, relkbg, piterg, cnubg, relktg, swtg, swg, relkg);
+
+	// Calculate consistent fluid velocities wrt global coordinates
+	double denom = 1.0 / (porg*swtg*viscg);
+	double pgx = dpdxg - RGXGM1;
+	double pgy = dpdyg - RGYGM1;
+	
+
+	if (dpdxg != 0)
+		if (abs(pgx / dpdxg) - 1e-10 <= 0)
+			pgx = 0.0;
+
+	if (dpdyg != 0)
+		if (abs(pgy / dpdyg) - 1e-10 <= 0)
+			pgy = 0.0;
+
+	
+
+	vxg = -denom*relktg*(el_permxx[L] * pgx + el_permxy[L] * pgy );
+	vyg = -denom*relktg*(el_permyx[L] * pgx + el_permyy[L] * pgy );
+
+	vgmag = sqrt(vxg*vxg + vyg*vyg );
+
+	// calculate asymmetric weighting functions
+
+	if (UP > 1.0e-6 && NOUMAT == 0)
+		goto fv;
+
+	for (int i = 0; i < 8; i++)
+	{
+		W[i] = F[i];
+		DWDXG[i] = DFDXG[i];
+		DWDYG[i] = DFDYG[i];
+	}
+
+	return;
+
+fv:
+	//calculate local fluid velocities
+	double vxl = CIJ[0] * vxg + CIJ[1] * vyg;
+	double vyl = CIJ[2] * vxg + CIJ[3] * vyg;
+	
+	double vlmag = sqrt(vxl*vxl + vyl*vyl);
+	double aa, bb, xixi, yiyi;
+	aa = bb  = 0.0;
+	if (vlmag > 0)
+	{
+		aa = UP * vxl / vlmag;
+		bb = UP * vyl / vlmag;
+	}
+	xixi = 0.75*aa*XF[0] * XF[1];
+	yiyi = 0.75*bb*YF[0] * YF[1];
+	
+	double  AFX[4];
+	double  AFY[4];
+	
+	for (int i = 0; i < 4; i++)
+	{
+		AFX[i] = 0.5*FX[i] + XIIX[i] * xixi;
+		AFY[i] = 0.5*FY[i] + YIIY[i] * yiyi;
+		
+	}
+
+	// Calculate asymmetric weighting funcs
+	for (int i = 0; i < 4; i++)
+		W[i] = AFX[i] * AFY[i] ;
+
+
+	double thaax = 0.5 - 1.5*aa*XLOC;
+	double thbby = 0.5 - 1.5*bb*YLOC;
+
+	double XDW[4];
+	double YDW[4];
+	
+
+	for (int i = 0; i < 4; i++)
+	{
+		XDW[i] = XIIX[i] * thaax;
+		YDW[i] = YIIY[i] * thbby;
+		
+	}
+
+	// calculate derivatives wrt local
+	double DWDXL[4];
+	double DWDYL[4];
+	
+
+	for (int i = 0; i < 4; i++)
+	{
+		DWDXL[i] = XDW[i] * AFY[i] ;
+		DWDYL[i] = YDW[i] * AFX[i] ;
+		
+	}
+
+
+	// calculate derviatives wrt global;
+	for (int i = 0; i < 4; i++)
+	{
+		DWDXG[i] = CIJ[0] * DWDXL[i] + CIJ[1] * DWDYL[i];
+		DWDYG[i] = CIJ[2] * DWDXL[i] + CIJ[3] * DWDYL[i];
+		
+	}
+
+}
+
+
+
+//std::string f_file = "p_vec";
+//f_file.append(std::to_string(IT));
+//f_file.append(".bin");
+//std::ofstream outpvecbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+//double rhsSize = (double)NN;
+//outpvecbin.write(reinterpret_cast < const char*>(&rhsSize), sizeof(double));
+//for (int i = 0; i < NN; i++)
+//	outpvecbin.write(reinterpret_cast < const char*>(&node_p_rhs[0] + i), sizeof(double));
+//outpvecbin.close();
+
+//f_file = "u_vec";
+//f_file.append(std::to_string(IT));
+//f_file.append(".bin");
+//std::ofstream outuvecbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+//outpvecbin.write(reinterpret_cast < const char*>(&rhsSize), sizeof(double));
+//for (int i = 0; i < NN; i++)
+//	outuvecbin.write(reinterpret_cast < const char*>(&node_u_rhs[0] + i), sizeof(double));
+//outuvecbin.close();
+
+//f_file = "u_MAT";
+//f_file.append(std::to_string(IT));
+//f_file.append(".bin");
+//std::ofstream outumatbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+//double nNelt = (double)NELT;
+//	outumatbin.write(reinterpret_cast < const char*>(&nNelt), sizeof(double));
+//for (int i = 0; i < NELT; i++)
+//	outumatbin.write(reinterpret_cast < const char*>(&UMAT[0] + i), sizeof(double));
+//outumatbin.close();
+
+//f_file = "p_MAT";
+//f_file.append(std::to_string(IT));
+//f_file.append(".bin");
+//std::ofstream outpmatbin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+//outpmatbin.write(reinterpret_cast < const char*>(&nNelt), sizeof(double));
+//for (int i = 0; i < NELT; i++)
+//	outpmatbin.write(reinterpret_cast < const char*>(&PMAT[0] + i), sizeof(double));
+//outpmatbin.close();
+/*
+if (!ONCEP)
+{
+f_file = "IA";
+f_file.append(std::to_string(IT));
+f_file.append(".bin");
+int IAsize = (int)IA.size();
+std::ofstream outiabin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+outiabin.write(reinterpret_cast < const char*>(&IAsize), sizeof(int));
+for (int i = 0; i < IAsize; i++)
+outiabin.write(reinterpret_cast < const char*>(&IA[0] + i), sizeof(int));
+outiabin.close();
+f_file = "JA";
+f_file.append(std::to_string(IT));
+f_file.append(".bin");
+int JAsize = (int)JA.size();
+std::ofstream outjabin("C:/Users/Mishac/Desktop/pvec_uvec/" + f_file, std::ios::binary);
+outjabin.write(reinterpret_cast < const char*>(&JAsize), sizeof(int));
+for (int i = 0; i < JAsize; i++)
+outjabin.write(reinterpret_cast < const char*>(&JA[0] + i), sizeof(int));
+outjabin.close();
+}*/

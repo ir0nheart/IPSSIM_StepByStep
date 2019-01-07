@@ -8,6 +8,7 @@ public:
 	double get_x() const{ return x; }
 	double get_y() const{ return y; }
 	double get_z() const{ return z; }
+	int get_element() const{ return in_element; }
 	void set_element(int val){ in_element = val; }
 	void set_xsi(double val){ xsi = val; }
 	void set_eta(double val){ eta = val; }

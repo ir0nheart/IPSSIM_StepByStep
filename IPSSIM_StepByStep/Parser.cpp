@@ -142,6 +142,7 @@ void Parser::findDataSetPositionsInMap()
 	}
 	dataSetOmit.push_back(dataSetLocation[2]);
 	dataSetOmit.push_back(dataSetLocation[4]);
+	if (DataSetStart.size()!=23)
 	dataSetOmit.push_back(dataSetLocation[12]);
 
 
@@ -159,12 +160,12 @@ void Parser::findDataSetPositionsInMap()
 			}
 		}
 		if (!bOmit){
-			if (dataSetLocation[i].second + 1 != dataSetLocation[i + 1].first){
-				p = { dataSetLocation[i].second + 1, dataSetLocation[i + 1].first - 1 };
-			}
-			else{
+			//if (dataSetLocation[i].second + 1 != dataSetLocation[i + 1].first){
+			//	p = { dataSetLocation[i].second + 1, dataSetLocation[i + 1].first - 1 };
+			//}
+			//else{
 				p = { dataSetLocation[i].second + 1, dataSetLocation[i + 1].first };
-			}
+			//}
 			dataSets.push_back(p);
 		}
 	}
@@ -840,64 +841,66 @@ void Parser::parseDataSet_8ABC()
 
 void Parser::parseDataSet_8D()
 {
-	int size = dataSets[11].second - dataSets[11].first;
-	std::vector<char> line;
-	std::vector<std::vector<char>> lines;
-	char * str_start = mapViewOfFile + dataSets[11].first;
-	char * str_end;
-	for (int i = dataSets[11].first; i < dataSets[11].second; i++){
-		if (mapViewOfFile[i] == '\r'){
-			str_end = mapViewOfFile + i;
-			line.assign(str_start, str_end);
-			//line.push_back('\0');
-			lines.push_back(line);
-			str_start = mapViewOfFile + i + 2;
-		}
-	}
-
-	if (lines.size() != storage->get_nobs() + 2)
-	{
-		std::cout << "Error in Data Set 8D.. " << std::endl;
-		SimulationControl::exitOnError();
-	}
-
-	if (lines[lines.size() - 1].size() != 1 || lines[lines.size() - 1][0] != '-')
-	{
-		std::cout << "Last line of Data Set 8D must be '-'.." << std::endl;
-		SimulationControl::exitOnError();
-	}
-	storage->set_observation_first_line(convertInt(lines[0]));
-
-	std::vector<char> tmp;
-	for (std::vector<std::vector<char> >::iterator i = lines.begin(); i != lines.end(); ++i)
-	{
-		for (std::vector<char>::iterator j = i->begin(); j != i->end(); ++j)
-		{
-			if (*j != '\'')
-				tmp.push_back(*j);
-
-		}
-		*i = tmp;
-		tmp.clear();
-	}
-	for (int i = 1; i < lines.size() - 1; i++){
-		std::vector<std::vector<char>> parsed_strings(13);
-		int it = 0;
-		for (char c : lines[i])
-		{
-			if (it > 0)
-			{
-				if (parsed_strings[it - 1].empty())
-					it = it - 1;
+	int size = dataSets[11].second - dataSets[11].first; 
+	if (size != 0){
+		std::vector<char> line;
+		std::vector<std::vector<char>> lines;
+		char * str_start = mapViewOfFile + dataSets[11].first;
+		char * str_end;
+		for (int i = dataSets[11].first; i < dataSets[11].second; i++){
+			if (mapViewOfFile[i] == '\r'){
+				str_end = mapViewOfFile + i;
+				line.assign(str_start, str_end);
+				//line.push_back('\0');
+				lines.push_back(line);
+				str_start = mapViewOfFile + i + 2;
 			}
-			if (c != ' ')
-				parsed_strings[it].push_back(c);
-			if (c == ' ')
-				it++;
-			
 		}
 
-		storage->add_obsData(parsed_strings);
+		if (lines.size() != storage->get_nobs() + 2)
+		{
+			std::cout << "Error in Data Set 8D.. " << std::endl;
+			SimulationControl::exitOnError();
+		}
+
+		if (lines[lines.size() - 1].size() != 1 || lines[lines.size() - 1][0] != '-')
+		{
+			std::cout << "Last line of Data Set 8D must be '-'.." << std::endl;
+			SimulationControl::exitOnError();
+		}
+		storage->set_observation_first_line(convertInt(lines[0]));
+
+		std::vector<char> tmp;
+		for (std::vector<std::vector<char> >::iterator i = lines.begin(); i != lines.end(); ++i)
+		{
+			for (std::vector<char>::iterator j = i->begin(); j != i->end(); ++j)
+			{
+				if (*j != '\'')
+					tmp.push_back(*j);
+
+			}
+			*i = tmp;
+			tmp.clear();
+		}
+		for (int i = 1; i < lines.size() - 1; i++){
+			std::vector<std::vector<char>> parsed_strings(13);
+			int it = 0;
+			for (char c : lines[i])
+			{
+				if (it > 0)
+				{
+					if (parsed_strings[it - 1].empty())
+						it = it - 1;
+				}
+				if (c != ' ')
+					parsed_strings[it].push_back(c);
+				if (c == ' ')
+					it++;
+
+			}
+
+			storage->add_obsData(parsed_strings);
+		}
 	}
 }
 
@@ -1468,7 +1471,7 @@ int Parser::convertInt(std::vector<char> cInt)
 	return val;		
 }
 void Parser::extractICS()
-{ // For Cold only
+{ 
 	std::vector<char> line;
 	std::vector<std::vector<char>> lines;
 
@@ -1479,6 +1482,33 @@ void Parser::extractICS()
 	int start_index = 0;
 	char * str_start = mapViewOfFile + start_index;
 	char * str_end;
+	//Check if Warm
+	bool ifWarm = false;
+	int ctr = 0;
+	for (int i = 0; i < size; i++){
+		if (mapViewOfFile[i] == '\r'){
+			str_end = mapViewOfFile + i;
+			line.assign(str_start, str_end);
+			ctr++;
+			if (ctr == 2)
+			{
+				std::string str(line.begin(), line.end());
+				if (str != "#Start_ics2")
+				{
+					ifWarm = true;
+				}
+					break;
+			}
+			start_index = i + 2;
+			str_start = mapViewOfFile + start_index;
+			
+		}
+	}
+
+	//
+	start_index = 0;
+	str_start = mapViewOfFile + start_index;
+
 	for (int i =0; i < size; i++){
 		if (mapViewOfFile[i] == '\r'){
 			str_end = mapViewOfFile + i;
@@ -1489,16 +1519,18 @@ void Parser::extractICS()
 			break;
 		}
 	}
-
-	for (int i = start_index; i <size; i++){
-		if (mapViewOfFile[i] == '\r'){
-			str_end = mapViewOfFile + i;
-			line.assign(str_start, str_end);
-			start_index = i + 2;
-			str_start = mapViewOfFile + start_index;
-			break;
+	if (!ifWarm){
+		for (int i = start_index; i < size; i++){
+			if (mapViewOfFile[i] == '\r'){
+				str_end = mapViewOfFile + i;
+				line.assign(str_start, str_end);
+				start_index = i + 2;
+				str_start = mapViewOfFile + start_index;
+				break;
+			}
 		}
 	}
+
 	for (int i = start_index; i <size; i++){
 		if (mapViewOfFile[i] == '\r'){
 			str_end = mapViewOfFile + i;
@@ -1512,20 +1544,55 @@ void Parser::extractICS()
 
 	int addedData = 0;
 	int NN = storage->get_nn();
-	for (int i = start_index; i <size; i++){
-		if (mapViewOfFile[i] == '\r'){
-			str_end = mapViewOfFile + i;
-			line.assign(str_start, str_end);
-			storage->add_p_ics(std::stod(line.data()));
-			addedData++;
-			start_index = i + 2;
-			str_start = mapViewOfFile + start_index;
-			if (addedData == NN){
-				addedData = 0;
-				break;
+	if (!ifWarm){
+		for (int i = start_index; i < size; i++){
+			if (mapViewOfFile[i] == '\r'){
+				str_end = mapViewOfFile + i;
+				line.assign(str_start, str_end);
+				storage->add_p_ics(std::stod(line.data()));
+				addedData++;
+				start_index = i + 2;
+				str_start = mapViewOfFile + start_index;
+				if (addedData == NN){
+					addedData = 0;
+					break;
+				}
+			}
+		}
+	} else
+	{
+		bool ended = false;
+		for (int i = start_index; i < size; i++){
+			if (mapViewOfFile[i] == '\r'){
+				str_end = mapViewOfFile + i;
+				line.assign(str_start, str_end);
+				line.push_back('\0');
+				storage->add_p_ics(std::stod(strtok(line.data()," ")));
+				addedData++;
+				for (int j = 0; j < 3; j++)
+				{
+					if (addedData == NN){
+						addedData = 0;
+						ended = true;
+						break;
+					}
+					storage->add_p_ics(std::stod(strtok(NULL, " ")));
+					addedData++;
+					if (addedData == NN){
+						addedData = 0;
+						ended = true;
+						break;
+					}
+				}
+				
+				start_index = i + 2;
+				str_start = mapViewOfFile + start_index;
+				if (ended)
+					break;
 			}
 		}
 	}
+
 	for (int i = start_index; i <size; i++){
 		if (mapViewOfFile[i] == '\r'){
 			str_end = mapViewOfFile + i;
@@ -1535,6 +1602,7 @@ void Parser::extractICS()
 			break;
 		}
 	}
+
 	for (int i = start_index; i <size; i++){
 		if (mapViewOfFile[i] == '\r'){
 			str_end = mapViewOfFile + i;

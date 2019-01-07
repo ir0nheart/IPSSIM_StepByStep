@@ -25,10 +25,13 @@
 #include <viennacl/linalg/gmres.hpp>
 #include <viennacl/linalg/ilu.hpp>
 #include <compcol_double.h>
-#include <ilupre_double.h>
+
 #include MATRIX_H
-#include "gmres.h"
 #include <ilupre_double.h>
+#include <icpre_double.h>
+#include "gmres.h"
+#include "cg.h"
+
 
 
 #pragma comment(lib,"C:/Code Libraries/SparseLib++/1.7/lib/libsparse.lib")

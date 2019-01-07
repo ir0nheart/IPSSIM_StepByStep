@@ -167,6 +167,7 @@ void SimulationControl::run()
 	store->output_initial_starting_if_transient();
 	store->set_steady_state_switches();
 	t.reset();
+	wConsole("Starting Solution..", BRIGHT_YELLOW);
 	store->simulation();
 	std::cout << t << " seconds for simulation" << std::endl;
 }

@@ -149,6 +149,7 @@
   <ItemGroup>
     <ClInclude Include="Bcs.h" />
     <ClInclude Include="BinaryOut.h" />
+    <ClInclude Include="cg.h" />
     <ClInclude Include="DataSet.h" />
     <ClInclude Include="Element.h" />
     <ClInclude Include="gmres.h" />
