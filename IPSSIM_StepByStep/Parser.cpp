@@ -341,11 +341,11 @@ void Parser::parseDataSet_2B()
 		std::string tmp = std::string(parsed_strings[i].begin(), parsed_strings[i].end());
 		if (tmp != "")
 			parsed_str.push_back(tmp);
-
 	}
 
 		
 	if (std::find(parsed_str.begin(), parsed_str.end(), "REGULAR") != parsed_str.end()){
+		
 		if (parsed_str.size() == 5)
 		{
 			storage->set_nn1_string(parsed_strings[3]);
@@ -360,10 +360,18 @@ void Parser::parseDataSet_2B()
 	}
 	else if (std::find(parsed_str.begin(), parsed_str.end(), "ACROSS") != parsed_str.end())
 	{
+		storage->set_LAYSTR("ACROSS");
 		storage->set_nl_across(parsed_strings[3]);
 		storage->set_nn_across(parsed_strings[4]);
 		storage->set_ne_across(parsed_strings[5]);
-	} else
+	}
+	else if (std::find(parsed_str.begin(), parsed_str.end(), "WITHIN") != parsed_str.end()){
+		storage->set_LAYSTR("WITHIN");
+		storage->set_nl_within(parsed_strings[3]);
+		storage->set_nn_within(parsed_strings[4]);
+		storage->set_ne_within(parsed_strings[5]);
+	}
+	else
 	{
 		std::cout << "Undefined Mesh Structure." << std::endl;
 		SimulationControl::exitOnError();

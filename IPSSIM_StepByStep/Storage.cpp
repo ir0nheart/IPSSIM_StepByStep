@@ -121,6 +121,20 @@ std::vector<char> Storage::get_nn_across() const
 	return nn_across;
 }
 
+std::vector<char> Storage::get_nl_within() const
+{
+	return nl_within;
+}
+
+std::vector<char> Storage::get_ne_within() const
+{
+	return ne_within;
+}
+
+std::vector<char> Storage::get_nn_within() const
+{
+	return nn_within;
+}
 std::vector<char> Storage::get_flow_type_string() const
 {
 	return flow_type_string;
@@ -926,7 +940,11 @@ void Storage::check_data_sets()
 	}
 	else if (!strncmp(mesh_type_string.data(), "LAYERED", mesh_type_string.size()))
 	{
-		KTYPE.push_back(0);
+		KTYPE.push_back(1);
+	}
+	else if (!strncmp(mesh_type_string.data(), "LAYERED", mesh_type_string.size()))
+	{
+		KTYPE.push_back(3);
 	}
 	else
 	{
@@ -935,7 +953,7 @@ void Storage::check_data_sets()
 	}
 
 
-	if (KTYPE[1] > 1)
+	if (KTYPE[1] > 1) // REGULAR OR BLOCKWISE
 	{
 		int NN123 = NN1*NN2*NN3;
 		int NE123 = 0;
@@ -3169,7 +3187,7 @@ void Storage::output_initial_starting_if_transient()
 
 		if (ISSFLO == 0)
 		{
-			//outNOD();
+			outNOD();
 			//outOBS();
 		}
 	}
@@ -3698,11 +3716,11 @@ BEGIN_ITERATION:
 			//PRNK5 = ((PRNDEF.OR.((IT.NE.0).AND.(MOD(IT,NCOLPR).EQ.0))          SUTRA........59200
 		//1.OR.((ITREL.EQ.1).AND.(NCOLPR.GT.0))).AND.(K5.NE. - 1))
 		NCOLPR = node_output_every;
-		//if (((IT != 0) && (IT % NCOLPR == 0)) || (ITREL == 1 && NCOLPR >0))
-		//	outNOD();
+		if (((IT != 0) && (IT % NCOLPR == 0)) || (ITREL == 1 && NCOLPR >0))
+			outNOD();
 		LCOLPR = element_output_every;
 		//if (((IT != 0) && (IT % LCOLPR == 0)) || (ITREL == 1 && LCOLPR > 0))
-		//	outELE();
+			outELE();
 
 		if (ISTOP == 0)
 			goto BEGIN_TIMESTEP;
@@ -5980,15 +5998,18 @@ void Storage::outELE()
 			_snprintf(buff, sizeof(buff), "## %1d-D, LAYERED MESH [", KTYPE[0]);
 			logLine.append(buff);
 			logLine.append(LAYSTR + "]");
-			_snprintf(buff, sizeof(buff), "       (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NLAYS, NNLAY, NN, NE);
-			logLine.append(buff);
+			if (LAYSTR == "ACROSS")
+			_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Elems ( %9d Nodes)\n",std::stoi(nl_across.data())-1,std::stoi(nn_across.data())-2,NE, NN);
+			else
+			_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Elems ( %9d Nodes)\n", std::stoi(nl_within.data())-1, std::stoi(nn_within.data())-2, NE, NN);
+			logLine.append(buff);                               
 			logLine.append("## \n");
 		}
 		else{
 			_snprintf(buff, sizeof(buff), "## %1d-D, IRREGULAR MESH", KTYPE[0]);
 			logLine.append(buff);
 			logLine.append(std::string(40, ' '));
-			_snprintf(buff, sizeof(buff), "%9d Nodes ( %9d Elems)\n", NN, NE);
+			_snprintf(buff, sizeof(buff), "%9d Elems ( %9d Nodes)\n", NE, NN);
 			logLine.append(buff);
 			logLine.append("## \n");
 		}
@@ -5998,12 +6019,25 @@ void Storage::outELE()
 		logLine.append(buff);
 		logLine.append("## " + std::string(92, '=') + "\n## \n");
 		logLine.append("##     Time steps" + std::string(22, ' ') + "[Printed? / Time step on which V is based]\n");
-		logLine.append("##    in this file      Time (sec)          VX             VY             VZ\n");
-		logLine.append("##  " + std::string(14, '-') + "   " + std::string(13, '-') + "    " + std::string(12, '-') + "   " + std::string(12, '-') + "   " + std::string(12, '-')+"\n");
-		for (int i = 1; i <= KTMAX; i++){
-			if (ITT[i] >= ITRST){
-				_snprintf(buff, sizeof(buff), "##        %8d    %+13.6e    %c %8d     %c %8d     %c %8d\n", ITT[i], TT[i],CPVX, ISVEL[i],CPVY,ISVEL[i],CPVZ,ISVEL[i]);
-				logLine.append(buff);
+		if (KTYPE[0] == 3){
+			logLine.append("##    in this file      Time (sec)          VX             VY             VZ\n");
+			logLine.append("##  " + std::string(14, '-') + "   " + std::string(13, '-') + "    " + std::string(12, '-') + "   " + std::string(12, '-') + "   " + std::string(12, '-') + "\n");
+			for (int i = 1; i <= KTMAX; i++){
+				if (ITT[i] >= ITRST){
+					_snprintf(buff, sizeof(buff), "##        %8d    %+13.6e    %c %8d     %c %8d     %c %8d\n", ITT[i], TT[i], CPVX, ISVEL[i], CPVY, ISVEL[i], CPVZ, ISVEL[i]);
+					logLine.append(buff);
+				}
+			}
+		}
+		else
+		{
+			logLine.append("##    in this file      Time (sec)          VX             VY\n");
+			logLine.append("##  " + std::string(14, '-') + "   " + std::string(13, '-') + "    " + std::string(12, '-') + "   " + std::string(12, '-') + "\n");
+			for (int i = 1; i <= KTMAX; i++){
+				if (ITT[i] >= ITRST){
+					_snprintf(buff, sizeof(buff), "##        %8d    %+13.6e    %c %8d     %c %8d\n", ITT[i], TT[i], CPVX, ISVEL[i], CPVY, ISVEL[i]);
+					logLine.append(buff);
+				}
 			}
 		}
 		onceELE = true;
@@ -6215,8 +6249,11 @@ void Storage::outNOD()
 			_snprintf(buff, sizeof(buff), "## %1d-D, LAYERED MESH [", KTYPE[0]);
 			logLine.append(buff);
 			logLine.append(LAYSTR + "]");
-			_snprintf(buff, sizeof(buff), "       (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NLAYS, NNLAY, NN, NE);
-			logLine.append(buff);
+			if (LAYSTR == "ACROSS")
+				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", std::stoi(nl_across.data()), std::stoi(nn_across.data()), NN, NE);
+			else
+				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", std::stoi(nl_within.data()), std::stoi(nn_within.data()), NN, NE);
+			logLine.append(buff);                                    
 			logLine.append("## \n");
 		}
 		else{
@@ -6277,13 +6314,19 @@ void Storage::outNOD()
 	}
 
 	
-
-	for (int i =0 ; i < NN; i++){
-
-		_snprintf(buff, sizeof(buff), "\n  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e", node_x[i],node_y[i],node_z[i],node_pvec[i],node_uvec[i],node_swt[i]);
-		logLine.append(buff);
+	if (KTYPE[0] == 3){
+		for (int i = 0; i < NN; i++){
+			_snprintf(buff, sizeof(buff), "\n  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e", node_x[i], node_y[i], node_z[i], node_pvec[i], node_uvec[i], node_swt[i]);
+			logLine.append(buff);
+		}
 	}
-
+	else
+	{
+		for (int i = 0; i < NN; i++){
+			_snprintf(buff, sizeof(buff), "\n  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e", node_x[i], node_y[i], node_pvec[i], node_uvec[i], node_swt[i]);
+			logLine.append(buff);
+		}
+	}
 
 	logWriter->add_line(logLine);
 

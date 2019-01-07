@@ -43,7 +43,7 @@ public:
 	void BASIS2(int ICALL, int L, double XLOC, double YLOC, double F[], double W[], double& DET, double CJ[],double& THICKG,
 		double DFDXG[], double DFDYG[], double DWDXG[], double DWDYG[], double & swbg, double& relkbg,
 		double & vxg, double&vyg, double & vgmag, double& swtg, double&relktg, double &viscg, double & rhog, double &rgxg, double&rgyg, double &porg);
-
+	void set_LAYSTR(std::string str){ LAYSTR = str; }
 	void ELEMN2();
 	void set_bcs_defined(bool v){ bcs_defined = v; }
 	bool get_bcs_defined()const { return bcs_defined; }
@@ -74,6 +74,9 @@ public:
 	void set_nl_across(std::vector<char> str){ nl_across = str; }
 	void set_nn_across(std::vector<char> str){ nn_across = str; }
 	void set_ne_across(std::vector<char> str){ ne_across = str; }
+	void set_nl_within(std::vector<char> str){ nl_within = str; }
+	void set_nn_within(std::vector<char> str){ nn_within = str; }
+	void set_ne_within(std::vector<char> str){ ne_within = str; }
 	std::vector<char> get_sutra_string() const;
 	std::vector<char> get_version_string() const;
 	std::vector<char> get_version_num_string() const;
@@ -87,6 +90,9 @@ public:
 	std::vector<char> get_nl_across() const;
 	std::vector<char> get_ne_across() const;
 	std::vector<char> get_nn_across() const;
+	std::vector<char> get_nl_within() const;
+	std::vector<char> get_ne_within() const;
+	std::vector<char> get_nn_within() const;
 	std::vector<char> get_flow_type_string() const;
 	std::vector<char> get_transport_type_string() const;
 	std::vector<char> get_simulation_condition_string() const;
@@ -287,6 +293,9 @@ private:
 	std::vector<char> nl_across;
 	std::vector<char> ne_across;
 	std::vector<char> nn_across;
+	std::vector<char> nl_within;
+	std::vector<char> ne_within;
+	std::vector<char> nn_within;
 	std::vector<char> flow_type_string;
 	std::vector<char> transport_type_string;
 	std::vector<char> simulation_condition_string;
