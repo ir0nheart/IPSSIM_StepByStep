@@ -3687,7 +3687,29 @@ BEGIN_ITERATION:
 			node_pvec[i] = node_p_solution[i];
 			node_uvec[i] = node_u_solution[i];
 		}
+<<<<<<< Updated upstream
 		goto BEGIN_TIMESTEP;
+=======
+
+		int IERR = abs(resultp) + abs(resultu);
+
+		//Changed
+
+		if (IT == ITMAX)
+			ISTOP = 1;
+
+			//PRNK5 = ((PRNDEF.OR.((IT.NE.0).AND.(MOD(IT,NCOLPR).EQ.0))          SUTRA........59200
+		//1.OR.((ITREL.EQ.1).AND.(NCOLPR.GT.0))).AND.(K5.NE. - 1))
+		NCOLPR = node_output_every;
+		//if (((IT != 0) && (IT % NCOLPR == 0)) || (ITREL == 1 && NCOLPR >0))
+		//	outNOD();
+		LCOLPR = element_output_every;
+		//if (((IT != 0) && (IT % LCOLPR == 0)) || (ITREL == 1 && LCOLPR > 0))
+		//	outELE();
+
+		if (ISTOP == 0)
+			goto BEGIN_TIMESTEP;
+>>>>>>> Stashed changes
 
 		// END OF SIMULATION DEALLOCATE ARRAYS AND SAY BB :D
 		std::cout << "END OF SIMULATION " << std::endl;
