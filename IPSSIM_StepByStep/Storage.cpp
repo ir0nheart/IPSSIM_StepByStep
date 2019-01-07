@@ -33,7 +33,7 @@ std::string Storage::K6SYM[] = { "E","X","Y","Z","VX","VY","VZ" };
 std::string Storage::VARNK5[] = { "NODE NUMBER", "X-COORDINATE", "Y-COORDINATE", "Z-COORDINATE", "PRESSURE", "CONCENTRATION", "SATURATION", "EFFECTIVE STRESS", "STRESS RATIO" };
 std::string Storage::VARNK6[] = { "ELEMENT NUMBER", "X-COORDINATE OF CENTROID", "Y-COORDINATE OF CENTROID", "Z-COORDINATE OF CENTROID", "X-VELOCITY", "Y-VELOCITY", "Z-VELOCITY" };
 int Storage::J6COL[] = {0,0,0,0,0,0,0};
-//std::string Storage::LCOL[] = { "X origin","Y origin","Z origin","X velocity", "Y velocity","Z velocity" };
+//std::string Storage::LCOL[] = { "" };
 int Storage::J5COL[] = {0,0,0,0,0,0,0,0,0};
 //std::string Storage::NCOL[] = { "Node","X","Y","Z","Pressure","Concentration","Saturation","Eff. Stress","Stress Rat." };
 std::string Storage::NCOL[] = { "X", "Y", "Z", "Pressure", "Concentration", "Saturation" };
@@ -1716,7 +1716,7 @@ void Storage::check_data_sets()
 			if (node_nreg[j] != NROLD)
 				NRTEST++;
 			NROLD = node_nreg[j];
-	}
+		}
 		std::cout << tt << "seconds for nodes" << std::endl;
 	}
 
@@ -1741,7 +1741,7 @@ void Storage::check_data_sets()
 			node_z[j] = node_z[j] * SCALZ;
 			node_por[j] = node_por[j] * PORFAC;
 			node_sop[j] = (1.0 - node_por[j])*COMPMA + node_por[j] * COMPFL;
-	}
+		}
 	}
 
 
@@ -1955,19 +1955,19 @@ void Storage::check_data_sets()
 	NOBS = NOBSN - 1;
 	NOBCYC = -1;
 	{ std::string obs_nam,obs_sch,obs_fmt;
-	double obs_x, obs_y, obs_z;
+		double obs_x, obs_y, obs_z;
 		obs_z = 0;
 		if (KTYPE[0] == 3){
-		for (std::vector<std::vector<char>> str : obsData)
-		{
+			for (std::vector<std::vector<char>> str : obsData)
+			{
 				obs_nam = std::string(str[0].begin(), str[0].end());
-			obs_x = std::stod(std::string(str[1].begin(), str[1].end()));
-			obs_y = std::stod(std::string(str[2].begin(), str[2].end()));
-			obs_z = std::stod(std::string(str[3].begin(), str[3].end()));
-			obs_sch = std::string(str[4].begin(), str[4].end());
-			obs_fmt = std::string(str[5].begin(), str[5].end());
-			obsContainer.push_back(obsPoint(obs_nam, obs_x, obs_y, obs_z, obs_sch, obs_fmt));
-		}
+				obs_x = std::stod(std::string(str[1].begin(), str[1].end()));
+				obs_y = std::stod(std::string(str[2].begin(), str[2].end()));
+				obs_z = std::stod(std::string(str[3].begin(), str[3].end()));
+				obs_sch = std::string(str[4].begin(), str[4].end());
+				obs_fmt = std::string(str[5].begin(), str[5].end());
+				obsContainer.push_back(obsPoint(obs_nam, obs_x, obs_y, obs_z, obs_sch, obs_fmt));
+			}
 		} else
 		{
 			for (std::vector<std::vector<char>> str : obsData)
@@ -1979,7 +1979,7 @@ void Storage::check_data_sets()
 				obs_sch = std::string(str[3].begin(), str[3].end());
 				obs_fmt = std::string(str[4].begin(), str[4].end());
 				obsContainer.push_back(obsPoint(obs_nam, obs_x, obs_y, obs_z, obs_sch, obs_fmt));
-	}
+			}
 		}
 	}
 
@@ -2266,7 +2266,7 @@ void Storage::check_data_sets()
 			el_almin[j] = std::stod(strtok(NULL, " "));
 			el_atmax[j] = std::stod(strtok(NULL, " "));
 			el_atmin[j] = std::stod(strtok(NULL, " "));
-	}
+		}
 	}
 
 	if (KTYPE[0] == 3){
@@ -2318,7 +2318,7 @@ void Storage::check_data_sets()
 		delete[] el_pmax;
 		delete[] el_pmid;
 		delete[] el_pmin;
-	}
+	} 
 	else if (KTYPE[0] == 2){
 		for (int j = 0; j < NE; j++)
 			el_pmax[j] = el_pmax[j] * PMAXFA;
@@ -2327,7 +2327,7 @@ void Storage::check_data_sets()
 
 		for (int j = 0; j < NE; j++)
 			el_ang1[j] = el_ang1[j] * ANG1FA;
-
+		
 
 		for (int j = 0; j < NE; j++)
 			el_atmax[j] = el_atmax[j] * ATMXF;
@@ -2903,7 +2903,7 @@ void Storage::allocate_element_arrays()
 		el_det = std::vector<std::vector<double>>(NE, std::vector<double>(N48, 0));
 		elementContainer.reserve(NE);
 	//}
-	}
+}
 void Storage::allocate_node_arrays()
 {
 	/*if (KTYPE[0] == 3)
@@ -2954,7 +2954,7 @@ void Storage::allocate_node_arrays()
 		node_relkt = new double[NN]{};
 		node_neighbors = std::vector<std::vector<int>>(NN, std::vector<int>());
 	//}
-	}
+}
 
 void Storage::de_allocate_node_arrays()
 { 
@@ -2982,7 +2982,7 @@ void Storage::de_allocate_node_arrays()
 		delete[] node_relkb;
 		delete[] node_relk;
 	//}
-	}
+}
 
 
 void Storage::de_allocate_element_arrays()
@@ -3446,7 +3446,7 @@ BEGIN_ITERATION:
 	if (ML <= 1)
 	{
 		if (KSOLVP)
-		init_a_val(PMAT, NELT, 0.0);
+			init_a_val(PMAT, NELT, 0.0);
 		else
 			init_a_val(direct_PMAT, NELT, 0);
 
@@ -3455,7 +3455,7 @@ BEGIN_ITERATION:
 		if (ML != 1)
 		{
 			if (NOUMAT <= 1)
-			{
+			{	
 				if (KSOLVU)
 				init_a_val(UMAT, NELT, 0.0);
 				else
@@ -3466,7 +3466,7 @@ BEGIN_ITERATION:
 	} else
 	{
 		if (NOUMAT <= 1)
-		{
+		{ 
 			if (KSOLVU)
 			init_a_val(UMAT, NELT, 0.0);
 			else
@@ -3507,10 +3507,10 @@ BEGIN_ITERATION:
 
 		int resultp, resultu;
 		resultp = resultu = 0;
-		
+
 		if (!KSOLVP){
 			std::vector<double> x(NN);
-		for (int i = 0; i < NN; i++)
+			for (int i = 0; i < NN; i++)
 			{
 				direct_PMAT[i][NN] = node_p_rhs[i];
 			}
@@ -3518,36 +3518,36 @@ BEGIN_ITERATION:
 			wConsolex(" DIRECT", BRIGHT_RED, 0);
 			wConsolex(" solver...", BRIGHT_BLUE, 1);
 			x = gauss(direct_PMAT);
-		for (int i = 0; i < NN; i++)
+			for (int i = 0; i < NN; i++)
 				node_p_solution[i] = x[i];
 		}
 		else{
-		double pnorm = DNRM2(NN, node_p_rhs, 1);
-		if (pnorm == 0)
-		{
-			for (int i = 0; i < NN; i++)
-				node_p_solution[i] = 0.0;
-			std::cout << " P solution inferred from Matrix equation. No solver called." << std::endl;
+			double pnorm = DNRM2(NN, node_p_rhs, 1);
+			if (pnorm == 0)
+			{
+				for (int i = 0; i < NN; i++)
+					node_p_solution[i] = 0.0;
+				std::cout << " P solution inferred from Matrix equation. No solver called." << std::endl;
 			}
 			else
-		{
-			CompCol_Mat_double A;
-			A.newsize(NN, NN, NELT);
-			for (int i = 0; i < NELT; i++)
 			{
-				A.val(i) = PMAT[i];
-				A.row_ind(i) = IA[i];
-			}
-			for (int i = 0; i < NN + 1; i++)
-				A.col_ptr(i) = JA[i];
+				CompCol_Mat_double A;
+				A.newsize(NN, NN, NELT);
+				for (int i = 0; i < NELT; i++)
+				{
+					A.val(i) = PMAT[i];
+					A.row_ind(i) = IA[i];
+				}
+				for (int i = 0; i < NN + 1; i++)
+					A.col_ptr(i) = JA[i];
 
 				VECTOR_double b(NN, 0), x(A.dim(1), 0.0);
 				//b.newsize(NN);
-			for (int i = 0; i < NN; i++)
-				b(i) = node_p_rhs[i];
+				for (int i = 0; i < NN; i++)
+					b(i) = node_p_rhs[i];
 				int restart = 20, it = max_p_iterations;
-			MATRIX_double H(restart + 1, restart, 0.0);
-			CompCol_ILUPreconditioner_double M(A);
+				MATRIX_double H(restart + 1, restart, 0.0);
+				CompCol_ILUPreconditioner_double M(A);
 				ICPreconditioner_double IC(A);
 				double tol = p_tolerance;
 				wConsolex("\t Starting ", BRIGHT_BLUE, 0);
@@ -3563,7 +3563,7 @@ BEGIN_ITERATION:
 				//CG();
 				if (!resultp)
 				{
-				ONCEP = true;
+					ONCEP = true;
 					//std::cout << "\tP - Solution Converged in " << it << " iterations  (Error ~ " << tol << " )" << std::endl;
 					char buff[100];
 					_snprintf(buff, 100, "%1.5E", tol);
@@ -3574,10 +3574,10 @@ BEGIN_ITERATION:
 					wConsolex(")", BRIGHT_BLUE, 1);
 				}
 
-			for (int i = 0; i < NN; i++)
+				for (int i = 0; i < NN; i++)
 					node_p_solution[i] = x(i);
 			}
-			}
+		}
 		if (ISSFLO != 0)
 		{
 			for (int i = 0; i < NN; i++)
@@ -3652,7 +3652,7 @@ BEGIN_ITERATION:
 				for (int i = 0; i < NN; i++)
 					node_u_solution[i] = x(i);
 			}
-			}
+		}
 		}
 
 	/*	for (int i = 0; i < NN; i++)
@@ -3688,10 +3688,9 @@ BEGIN_ITERATION:
 			node_uvec[i] = node_u_solution[i];
 		}
 
-
 		int IERR = abs(resultp) + abs(resultu);
 
-		//Changed
+
 
 		if (IT == ITMAX)
 			ISTOP = 1;
@@ -3707,7 +3706,6 @@ BEGIN_ITERATION:
 
 		if (ISTOP == 0)
 			goto BEGIN_TIMESTEP;
-
 
 		// END OF SIMULATION DEALLOCATE ARRAYS AND SAY BB :D
 		std::cout << "END OF SIMULATION " << std::endl;
@@ -3812,7 +3810,7 @@ void Storage::BCSTEP()
 
 		if ((bcs->getNumberOfQINC() + bcs->getNumberOfQUINC()) > 0)
 		{
-			
+	
 			for (int i = 0; i < NSOPI1; i++)
 			{
 				int IQP = -1;
@@ -4068,7 +4066,7 @@ void Storage::ELEMN3()
 			}
 			ZIZ = -ZIZ;
 		}
-		
+
 		// Transpose Matrices for indice compatibility of SUTRA
 		
 		transpose(F);
@@ -4574,11 +4572,11 @@ void Storage::ELEMN2()
 				
 				for (int p = 0; p < 8; p++)
 				{
-	
+
 					bflowe[p][j] = bflowe[p][j] + DFDXG[p][kg] * rddfjx + DFDYG[p][kg] * rddfjy;
 				}
 
-}
+			}
 		}
 
 	check:
@@ -4760,7 +4758,7 @@ void Storage::NODAL()
 				double dudt = (1 - ISSFLO / 2)*(node_um1[i] - node_um2[i]) / DLTUM1;
 				cfln = cfln * dudt - (node_sw[i] * GCONST*TEMP*node_por[i] * node_rho[i] * ((node_swb[i] * node_swb[i]) / (PSTAR + node_piter[i]))*(-0.5*PRODF1*(node_rho[i] * node_uiter[i] / SMWH)))*node_vol[i];
 				if (KSOLVP != 0)
-				PMAT[IMID] = PMAT[IMID] + afln;
+					PMAT[IMID] = PMAT[IMID] + afln;
 				else
 					direct_PMAT[IMID][IMID] = direct_PMAT[IMID][IMID] + afln;
 				node_p_rhs[i] = node_p_rhs[i] - cfln + afln * node_pm1[i] + node_qin[i];
@@ -4785,7 +4783,7 @@ void Storage::NODAL()
 			}
 			if (NOUMAT != 1){
 				if (KSOLVU !=0)
-				UMAT[IMID] = UMAT[IMID] + atrn - gtrn - gsltrn - qul;
+					UMAT[IMID] = UMAT[IMID] + atrn - gtrn - gsltrn - qul;
 				else
 					direct_UMAT[IMID][IMID] = direct_UMAT[IMID][IMID] + atrn - gtrn - gsltrn - qul;
 			}
@@ -4819,7 +4817,7 @@ void Storage::BC()
 					double gpinl = -GNUP1[ip];
 					double gpinr = GNUP1[ip] * node_pbc[i];
 					if (KSOLVP)
-					PMAT[IMID] = PMAT[IMID] - gpinl;
+						PMAT[IMID] = PMAT[IMID] - gpinl;
 					else
 						direct_PMAT[IMID][IMID] = direct_PMAT[IMID][IMID] - gpinl;
 					node_p_rhs[i] = node_p_rhs[i] + gpinr;
@@ -4836,7 +4834,7 @@ void Storage::BC()
 				}
 				if (NOUMAT != 1){
 					if (KSOLVU)
-					UMAT[IMID] = UMAT[IMID] - gul;
+						UMAT[IMID] = UMAT[IMID] - gul;
 					else
 						direct_UMAT[IMID][IMID] = direct_UMAT[IMID][IMID] - gul;
 				}
@@ -4862,7 +4860,7 @@ void Storage::BC()
 				{
 					double GUINL = -GNUU1[ip];
 					if (KSOLVU)
-					UMAT[IMID] = UMAT[IMID] - GUINL;
+						UMAT[IMID] = UMAT[IMID] - GUINL;
 					else
 						direct_UMAT[IMID][IMID] = direct_UMAT[IMID][IMID] - GUINL;
 				}
@@ -5837,47 +5835,12 @@ void Storage::outLST()
 			}
 			if (IT == 0 && ISSFLO == 2)
 			{
-				if (KPANDS == 1)
-				{
-					logLine.append("\n\n\n\n           S T E A D Y - S T A T E   P R E S S U R E\n\n  ");
-					logLine.append("      NODE                      NODE                      NODE                      NODE                      NODE                \n");
-					int ctr = 0;
-					for (int j = 0; j < NN; j++)
-					{
-						_snprintf(buff, 1024, "   %9d %15.8e", j + 1, node_swt[j]);
-						logLine.append(buff);
-						ctr++;
-						if (ctr == 5 || j == NN - 1){
-							logLine.append("\n");
-							ctr = 0;
-						}
-					}
-				}
-				return;
+				
 			} else
 			{
 				if (ISSTRA == 1)
 				{
-					if (KCORT == 1)
-					{
-						if (ME <= 0)
-						{
-							logLine.append("\n\n\n\n           S T E A D Y - S T A T E   C O N C E N T R A T I O N\n\n  ");
-							logLine.append("      NODE                      NODE                      NODE                      NODE                      NODE                \n");
-							int ctr = 0;
-							for (int j = 0; j < NN; j++)
-							{
-								_snprintf(buff, 1024, "   %9d %15.8e", j + 1, node_uvec[j]);
-								logLine.append(buff);
-								ctr++;
-								if (ctr == 5 || j == NN - 1){
-									logLine.append("\n");
-									ctr = 0;
-								}
-							}
-						}
 					
-					}
 				} else
 				{
 					logLine.append("\n\n\n");
@@ -5916,7 +5879,6 @@ void Storage::outELE()
 	std::vector<double> TT;
 	std::vector<int> ITT;
 	std::vector<int> ISVEL;
-	LCOLPR = element_output_every;
 	if (onceELE == false)
 	{
 		std::string eleFile;
@@ -6050,7 +6012,58 @@ void Storage::outELE()
 	if ((ISSFLO == 2) && (IT > 1))
 		return;
 
+	if (IT == 1 && ISSTRA == 1)
+	{
+		DURN = 0.0;
+		TOUT = TSTART;
+	} else
+	{
+		DURN = DELT;
+		TOUT = TSEC;
+	}
+	logLine.append("## \n");
+	logLine.append("## " + std::string(98, '=') + "\n");
+	_snprintf(buff, sizeof(buff), "## TIME STEP %8d", IT);
+	logLine.append(buff + std::string(26, ' '));
+	_snprintf(buff, sizeof(buff), "Duration: %+11.4e sec      Time: %+11.4e sec\n", DURN, TOUT);
+	logLine.append(buff);
+	logLine.append("## " + std::string(98, '=') + "\n");
 
+	//if (NCOL[0] == "'N'"){ // printNodeNumber
+	logLine.append("##");
+	for (std::string a : LCOL){
+		int fil = 14 - a.length();
+		logLine.append(std::string(fil, ' ') + a +" " );
+	}
+
+	
+	double rn48 = 1.0 / N48;
+	for (int i = 0; i < NE; i++){
+		double cntrx, cntry, cntrz;
+		cntrx = cntry = cntrz = 0;
+		for (int j = 0; j < N48; j++)
+		{
+			int iii = j + i*N48;
+			int kkk = incidence_vector[iii] - 1;
+			cntrx = cntrx + node_x[kkk];
+			cntry = cntry + node_y[kkk];
+			cntrz = cntrz + node_z[kkk];
+		}
+		cntrx = cntrx * rn48;
+		cntry = cntry * rn48;
+		cntrz = cntrz * rn48;
+		double va1 = 0.017453292*el_vang1[i];
+		int LL = min(i, NEX - 1);
+		double va2 = 0.017453292*el_vang2[LL] * (KTYPE[0] - 2);
+		double cva2 = cos(va2);
+		double VECTRX = el_vmag[i]*cos(va1)*cva2; 
+		double VECTRY = el_vmag[i] * sin(va1)*cva2;
+		double VECTRZ = el_vmag[i] * sin(va2);
+
+		_snprintf(buff, sizeof(buff), "\n  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e", cntrx,cntry,cntrz,VECTRX,VECTRY,VECTRZ);
+		logLine.append(buff);
+	}
+	logWriter->add_line(logLine);
 }
 void Storage::outNOD()
 {
@@ -6256,12 +6269,6 @@ void Storage::outNOD()
 	logLine.append(buff);
 	logLine.append("## " + std::string(98, '=') + "\n");
 
-
-
-
-
-
-
 	//if (NCOL[0] == "'N'"){ // printNodeNumber
 	logLine.append("##");
 	for (std::string a : NCOL){
@@ -6269,17 +6276,16 @@ void Storage::outNOD()
 		logLine.append(std::string(fil, ' ') + a+" ");
 	}
 
+	
 
 	for (int i =0 ; i < NN; i++){
 
-		_snprintf(buff, sizeof(buff), "  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e\n", node_x[i],node_y[i],node_z[i],node_pvec[i],node_uvec[i],node_swt[i]);
+		_snprintf(buff, sizeof(buff), "\n  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e", node_x[i],node_y[i],node_z[i],node_pvec[i],node_uvec[i],node_swt[i]);
 		logLine.append(buff);
 	}
 
 
 	logWriter->add_line(logLine);
-
-
 
 }
 void Storage::outOBS()
@@ -6294,7 +6300,7 @@ void Storage::outOBS()
 		std::cout << obs.get_z() << std::endl;
 
 		std::cout << obs.get_element() << std::endl;
-}
+	}
 }
 
 /*	std::ofstream outbin("p_rhs.bin", std::ios::binary);
