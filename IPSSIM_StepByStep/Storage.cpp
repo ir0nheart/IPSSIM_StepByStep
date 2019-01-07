@@ -33,7 +33,11 @@ std::string Storage::K6SYM[] = { "E","X","Y","Z","VX","VY","VZ" };
 std::string Storage::VARNK5[] = { "NODE NUMBER", "X-COORDINATE", "Y-COORDINATE", "Z-COORDINATE", "PRESSURE", "CONCENTRATION", "SATURATION", "EFFECTIVE STRESS", "STRESS RATIO" };
 std::string Storage::VARNK6[] = { "ELEMENT NUMBER", "X-COORDINATE OF CENTROID", "Y-COORDINATE OF CENTROID", "Z-COORDINATE OF CENTROID", "X-VELOCITY", "Y-VELOCITY", "Z-VELOCITY" };
 int Storage::J6COL[] = {0,0,0,0,0,0,0};
+<<<<<<< HEAD
 //std::string Storage::LCOL[] = { "" };
+=======
+std::string Storage::LCOL[] = { "X origin","Y origin","Z origin","X velocity", "Y velocity","Z velocity" };
+>>>>>>> 92d3a7ca10ee1205ecff4f31491b52782ba69483
 int Storage::J5COL[] = {0,0,0,0,0,0,0,0,0};
 //std::string Storage::NCOL[] = { "Node","X","Y","Z","Pressure","Concentration","Saturation","Eff. Stress","Stress Rat." };
 std::string Storage::NCOL[] = { "X", "Y", "Z", "Pressure", "Concentration", "Saturation" };
@@ -3687,6 +3691,7 @@ BEGIN_ITERATION:
 			node_pvec[i] = node_p_solution[i];
 			node_uvec[i] = node_u_solution[i];
 		}
+<<<<<<< HEAD
 
 		int IERR = abs(resultp) + abs(resultu);
 
@@ -3711,6 +3716,10 @@ BEGIN_ITERATION:
 		std::cout << "END OF SIMULATION " << std::endl;
 		de_allocate_node_arrays();
 		de_allocate_element_arrays();
+=======
+		outELE();
+		goto BEGIN_TIMESTEP;
+>>>>>>> 92d3a7ca10ee1205ecff4f31491b52782ba69483
 }
 
 
@@ -5835,12 +5844,47 @@ void Storage::outLST()
 			}
 			if (IT == 0 && ISSFLO == 2)
 			{
-				
+				if (KPANDS == 1)
+				{
+					logLine.append("\n\n\n\n           S T E A D Y - S T A T E   P R E S S U R E\n\n  ");
+					logLine.append("      NODE                      NODE                      NODE                      NODE                      NODE                \n");
+					int ctr = 0;
+					for (int j = 0; j < NN; j++)
+					{
+						_snprintf(buff, 1024, "   %9d %15.8e", j + 1, node_swt[j]);
+						logLine.append(buff);
+						ctr++;
+						if (ctr == 5 || j == NN - 1){
+							logLine.append("\n");
+							ctr = 0;
+						}
+					}
+				}
+				return;
 			} else
 			{
 				if (ISSTRA == 1)
 				{
-					
+					if (KCORT == 1)
+					{
+						if (ME <= 0)
+						{
+							logLine.append("\n\n\n\n           S T E A D Y - S T A T E   C O N C E N T R A T I O N\n\n  ");
+							logLine.append("      NODE                      NODE                      NODE                      NODE                      NODE                \n");
+							int ctr = 0;
+							for (int j = 0; j < NN; j++)
+							{
+								_snprintf(buff, 1024, "   %9d %15.8e", j + 1, node_uvec[j]);
+								logLine.append(buff);
+								ctr++;
+								if (ctr == 5 || j == NN - 1){
+									logLine.append("\n");
+									ctr = 0;
+								}
+							}
+						}
+
+					}
 				} else
 				{
 					logLine.append("\n\n\n");
@@ -5879,6 +5923,7 @@ void Storage::outELE()
 	std::vector<double> TT;
 	std::vector<int> ITT;
 	std::vector<int> ISVEL;
+	LCOLPR = element_output_every;
 	if (onceELE == false)
 	{
 		std::string eleFile;
@@ -6016,11 +6061,17 @@ void Storage::outELE()
 	{
 		DURN = 0.0;
 		TOUT = TSTART;
+<<<<<<< HEAD
 	} else
+=======
+	}
+	else
+>>>>>>> 92d3a7ca10ee1205ecff4f31491b52782ba69483
 	{
 		DURN = DELT;
 		TOUT = TSEC;
 	}
+<<<<<<< HEAD
 	logLine.append("## \n");
 	logLine.append("## " + std::string(98, '=') + "\n");
 	_snprintf(buff, sizeof(buff), "## TIME STEP %8d", IT);
@@ -6028,6 +6079,57 @@ void Storage::outELE()
 	_snprintf(buff, sizeof(buff), "Duration: %+11.4e sec      Time: %+11.4e sec\n", DURN, TOUT);
 	logLine.append(buff);
 	logLine.append("## " + std::string(98, '=') + "\n");
+=======
+
+
+
+
+
+	logLine.append("## \n## " + std::string(92, '=') + "\n ## TIME STEP ");
+	_snprintf(buff, 1024, "%8d                       Duration: %11.4e sec      Time: %11.4e sec \n ## ", IT, DURN, TOUT);
+	logLine.append(buff);
+	logLine.append(std::string(92, '=') +"\n");
+
+
+	logLine.append("##");
+	for (std::string a : LCOL){
+		int fil = 15 - a.length();
+		logLine.append(std::string(fil, ' ') + a + "  ");
+	}
+
+	logLine.append("\n");
+	double centrx, centry, centrz;
+	for (int i = 0; i < NE; i++){
+		centrx = centry = centrz = 0;
+		for (int v : incidenceContainer[i].second)
+		{
+			centrx = centrx + node_x[v - 1];
+			centry = centry + node_y[v - 1];
+			centrz = centrz + node_z[v - 1];
+		}
+		centrx = centrx * 1 / N48;
+		centry = centry * 1 / N48;
+		centrz = centrz * 1 / N48;
+		double va1 = 0.017453292*el_vang1[i];
+		int ll = min(i + 1, NEX);
+		double va2 = 0.017453292*el_vang2[ll - 1] * (KTYPE[0]-2);
+		double cva = cos(va2);
+
+		double vectrx = el_vmag[i] * cos(va1)*cva;
+		double vectry = el_vmag[i] * sin(va1)*cva;
+		double vectrz = el_vmag[i] * sin(va2);
+		_snprintf(buff, sizeof(buff), "  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e\n", centrx,centry,centrz,vectrx,vectry,vectrz);
+		logLine.append(buff);
+	}
+
+
+	logWriter->add_line(logLine);
+
+
+
+
+
+>>>>>>> 92d3a7ca10ee1205ecff4f31491b52782ba69483
 
 	//if (NCOL[0] == "'N'"){ // printNodeNumber
 	logLine.append("##");
@@ -6269,7 +6371,13 @@ void Storage::outNOD()
 	logLine.append(buff);
 	logLine.append("## " + std::string(98, '=') + "\n");
 
+<<<<<<< HEAD
 	//if (NCOL[0] == "'N'"){ // printNodeNumber
+=======
+
+
+
+>>>>>>> 92d3a7ca10ee1205ecff4f31491b52782ba69483
 	logLine.append("##");
 	for (std::string a : NCOL){
 		int fil = 14 - a.length();
@@ -6278,14 +6386,20 @@ void Storage::outNOD()
 
 	
 
-	for (int i =0 ; i < NN; i++){
+	for (int i = 0; i < NN; i++){
 
+<<<<<<< HEAD
 		_snprintf(buff, sizeof(buff), "\n  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e", node_x[i],node_y[i],node_z[i],node_pvec[i],node_uvec[i],node_swt[i]);
+=======
+		_snprintf(buff, sizeof(buff), "  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e  %+14.7e\n", node_x[i], node_y[i], node_z[i], node_pvec[i], node_uvec[i], node_swt[i]);
+>>>>>>> 92d3a7ca10ee1205ecff4f31491b52782ba69483
 		logLine.append(buff);
 	}
 
 
 	logWriter->add_line(logLine);
+
+
 
 }
 void Storage::outOBS()
