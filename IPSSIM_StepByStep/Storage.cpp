@@ -3687,9 +3687,7 @@ BEGIN_ITERATION:
 			node_pvec[i] = node_p_solution[i];
 			node_uvec[i] = node_u_solution[i];
 		}
-<<<<<<< Updated upstream
-		goto BEGIN_TIMESTEP;
-=======
+
 
 		int IERR = abs(resultp) + abs(resultu);
 
@@ -3709,7 +3707,7 @@ BEGIN_ITERATION:
 
 		if (ISTOP == 0)
 			goto BEGIN_TIMESTEP;
->>>>>>> Stashed changes
+
 
 		// END OF SIMULATION DEALLOCATE ARRAYS AND SAY BB :D
 		std::cout << "END OF SIMULATION " << std::endl;
