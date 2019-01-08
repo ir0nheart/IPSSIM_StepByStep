@@ -7165,6 +7165,32 @@ void Storage::BUDGET()
 		double actfmb = 0.5*(stfpos - stfneg + qffpos - qffneg);
 		double erfmba = stftot - qfftot;
 		std::cout << "Check here" << std::endl;
+		double erfmbr = 0;
+		if (actfmb != 0.0)
+		{
+			erfmbr = 100 * erfmba / actfmb;
+			char buff[1024];
+			_snprintf(buff, 1024, "             RELATIVE FLUID MASS BALANCE ERROR [ 100*(S - F)/A ]                            %+15.7e (PERCENT)\n", erfmbr);
+		}
+		else
+		{
+			std::string str = std::string(13, ' ') + "RELATIVE FLUID MASS BALANCE ERROR [ 100*(S - F)/A ]" + std::string(28, ' ') + " UNDEFINED";
+		}
+
+		if (IBCT != 4)
+		{
+			
+		}
+
+		if (NPBC != 0)
+		{
+			char buff[1024];
+			for (int i = 0; i < IPBC.size(); i++)
+			{
+				int n = abs(IPBC[i])-1;
+				_snprintf(buff, 1024, "                 %9d          %+15.7e", n, GNUP1[i] * (node_pbc[n] - node_pvec[n]));
+			}
+		}
 	}
 
 	if (ML == 1)
