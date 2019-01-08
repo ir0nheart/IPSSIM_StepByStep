@@ -3734,6 +3734,7 @@ BEGIN_ITERATION:
 
 			//PRNK5 = ((PRNDEF.OR.((IT.NE.0).AND.(MOD(IT,NCOLPR).EQ.0))          SUTRA........59200
 		//1.OR.((ITREL.EQ.1).AND.(NCOLPR.GT.0))).AND.(K5.NE. - 1))
+			BUDGET();
 		NCOLPR = node_output_every;
 		if (((IT != 0) && (IT % NCOLPR == 0)) || (ITREL == 1 && NCOLPR >0))
 			outNOD();
@@ -7104,3 +7105,98 @@ for (int i = 0; i < JAsize; i++)
 outjabin.write(reinterpret_cast < const char*>(&JA[0] + i), sizeof(int));
 outjabin.close();
 }*/
+void Storage::BUDGET()
+{
+	int MN = 2;
+	if (IUNSAT != 0) IUNSAT = 1;
+	if (ME == -1) MN = 1;
+
+
+	if (IUNSAT == 1)
+	{
+		// Unsaturated Parameters
+		std::cout << "UNSAT is not implemented " << std::endl;
+		SimulationControl::exitOnError();
+	}
+
+	if (ML <= 1)
+	{
+		double stppos, stpneg;
+		double stupos, stuneg;
+		double qinpos, qinneg;
+		double stptot, stutot, stfpos, stfneg, qintot,stftot;
+		stppos = stupos = stuneg = stpneg = qinpos = qinneg =stftot= 0.0;
+		// Loop through nodes
+		for (int i = 0; i < NN; i++)
+		{
+			double term = ((1 - (double)ISSFLO / 2)*node_rho[i] * node_vol[i]) * (node_swt[i] * node_sop[i] + node_por[i] * node_dswdp[i])*
+				(node_pvec[i] - node_pm1[i]) / DELTP;
+			stppos = stppos + max(0.0, term);
+			stpneg = stpneg + min(0.0, term);
+			term = (1 - (double)ISSFLO / 2) *node_por[i] * node_swt[i] * DRWDU*node_vol[i] * (node_um1[i] - node_um2[i]) / DLTUM1;
+			stupos = stupos + max(0.0, term);
+			stuneg = stuneg + min(0.0, term);
+			term = node_qin[i];
+			qinpos = qinpos + max(0.0, term);
+			qinneg = qinneg + min(0.0, term);
+		}
+
+		stptot = stppos + stpneg;
+		stutot = stupos + stuneg;
+		stfpos = stppos + stupos;
+		stfneg = stpneg + stuneg;
+		stftot = stptot + stutot;
+		qintot = qinpos + qinneg;
+
+		double qplpos, qplneg,qpltot,qffpos,qffneg,qfftot;
+		qplpos = qplneg =qpltot=qffpos=qffneg=qfftot= 0;
+		// Loop through boundary conds
+		for (int i = 0; i < IPBC.size();i++)
+		{
+			int n = abs(IPBC[i] - 1);
+			double term = GNUP1[i] * (node_pbc[n] - node_pvec[n]);
+			qplpos = qplpos + max(0.0, term);
+			qplneg = qplneg + min(0.0, term);
+		}
+		qpltot = qplpos + qplneg;
+		qffpos = qinpos + qplpos;
+		qffneg = qinneg + qplneg;
+		qfftot = qintot + qpltot;
+		double actfmb = 0.5*(stfpos - stfneg + qffpos - qffneg);
+		double erfmba = stftot - qfftot;
+		std::cout << "Check here" << std::endl;
+	}
+
+	if (ML == 1)
+		return;
+	double fldpos, fldneg;
+	double sldpos, sldneg;
+	double dnspos, dnsneg;
+	double p1fpos, p1fneg;
+	double p1spos, p1sneg;
+	double p0fpos, p0sneg;
+	double qqupos, qquneg;
+	double qiupos, qiuneg;
+	fldpos = fldneg = sldpos = sldneg = dnspos = dnsneg = p1fpos = p1fneg = p1spos = p1sneg = 0;
+	p0fpos= p0sneg=qqupos= qquneg= qiupos= qiuneg=0;
+	// Check Adsorption
+	if (ME == -1 && adsorption_string.data() != "NONE")
+		ADSORB();
+
+	// Iterate through nodes
+	for (int i = 0; i < NN; i++)
+	{
+		double term = 0;
+		term = CW*(node_por[i] * node_swt[i] * node_rho[i] * node_vol[i])*((1 - ISSTRA) *(node_uvec[i] - node_um1[i]) / DELTU);
+		fldpos = fldpos + max(0.0, term);
+		fldneg = fldneg + min(0.0, term);
+		term = ((1 - ISSTRA) *(node_uvec[i] - node_um1[i]) / DELTU) * node_cs1[i] * ((1.0 - node_por[i])*RHOS*node_vol[i]);
+		sldpos = sldpos + max(0.0, term);
+		sldneg = sldneg + min(0.0, term);
+		term = CW * node_uvec[i] * (1 - (double)ISSFLO / 2)*node_vol[i] * (node_rho[i] * (node_swt[i] * node_sop[i] + node_por[i] * node_dswdp[i])*node_dpdtitr[i])
+			+ node_por[i] * node_swt[i] * DRWDU*(node_um1[i] - node_um2[i]) / DLTUM1;
+		dnspos = dnspos + max(0.0, term);
+		dnsneg = dnsneg + min(0.0, term);
+
+	}
+}

@@ -274,7 +274,7 @@ public:
 	void add_bcs(Bcs * bcs){ bcsContainer.push_back(bcs); }
 	std::vector<Bcs *> get_bcs_container(){ return bcsContainer; }
 	double DNRM2(int N, double * X, int INCX);
-
+	void BUDGET();
 	void re_orient_matrix(int jmper_size, int vals_size, double vals[], std::vector<int>&jmper, std::vector<int>& indices, double * new_vals, int * new_jmper, int * new_indices);
 private:
 	static Storage * m_pInstance;
