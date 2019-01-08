@@ -331,13 +331,14 @@ private:
 
 	std::vector<double> p_ics;
 	std::vector<double> u_ics;
-
+	std::vector<std::string> obsLists;
 	std::vector<Schedule *> schedule_list;
 	bool ONCEP;
 	bool SETBCS;
 	bool INTIM;
 	bool onceNOD;
 	bool onceELE;
+	bool onceOBS;
 	char CINACT;
 
 	int KT;

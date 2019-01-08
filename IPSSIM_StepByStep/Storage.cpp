@@ -3154,6 +3154,8 @@ void Storage::set_flags()
 	ONCEP = false;
 	onceNOD = false;
 	onceELE = false;
+	onceOBS = false;
+
 	SETBCS = true;
 	IBCT = IQSOPT + IQSOUT + IPBCT + IUBCT;
 	
@@ -3187,8 +3189,22 @@ void Storage::output_initial_starting_if_transient()
 
 		if (ISSFLO == 0)
 		{
+			// Check The Obs Pts
+
+			for (obsPoint obs : obsContainer)
+			{
+				if (obsLists.empty())
+					obsLists.push_back(obs.get_obs_sch());
+				else
+					if (!(std::find(obsLists.begin(), obsLists.end(), obs.get_obs_sch()) != obsLists.end()))
+					{
+						obsLists.push_back(obs.get_obs_sch());
+					}
+			}
+
+
 			outNOD();
-			//outOBS();
+			outOBS();
 		}
 	}
 }
@@ -3224,7 +3240,10 @@ void Storage::simulation()
 	Writer * smyWriter = Writer::instance("SMY");
 	Writer * nodWriter = Writer::instance("NOD");
 	Writer * eleWriter = Writer::instance("ELE");
-	Writer * obsWriter = Writer::instance("OBS");
+
+
+	
+	
 	std::string smyFile,nodFile,eleFile,obsFile;
 	char buff[1024];
 	std::string logLine;
@@ -3237,9 +3256,9 @@ void Storage::simulation()
 	eleFile.append(InputFiles::instance()->getInputDirectory());
 	eleFile.append(InputFiles::instance()->getFilesForWriting()["ELE"]);
 	eleWriter->set_filename(eleFile);
-	obsFile.append(InputFiles::instance()->getInputDirectory());
-	obsFile.append(InputFiles::instance()->getFilesForWriting()["OBS"]);
-	obsWriter->set_filename(obsFile);
+//	obsFile.append(InputFiles::instance()->getInputDirectory());
+//	obsFile.append(InputFiles::instance()->getFilesForWriting()["OBS"]);
+//	obsWriter->set_filename(obsFile);
 	logLine.append("\n          ");
 	logLine.append(std::string(53, '='));
 	logLine.append("\n\n");
@@ -3719,13 +3738,17 @@ BEGIN_ITERATION:
 		if (((IT != 0) && (IT % NCOLPR == 0)) || (ITREL == 1 && NCOLPR >0))
 			outNOD();
 		LCOLPR = element_output_every;
-		//if (((IT != 0) && (IT % LCOLPR == 0)) || (ITREL == 1 && LCOLPR > 0))
+		if (((IT != 0) && (IT % LCOLPR == 0)) || (ITREL == 1 && LCOLPR > 0))
 			outELE();
+
+		if (NPCYC > 0 && (IT != 0) && ((IT%NPCYC == 0) || IT == ITMAX))
+			outOBS();
 
 		if (ISTOP == 0)
 			goto BEGIN_TIMESTEP;
 
 		// END OF SIMULATION DEALLOCATE ARRAYS AND SAY BB :D
+		
 		std::cout << "END OF SIMULATION " << std::endl;
 		de_allocate_node_arrays();
 		de_allocate_element_arrays();
@@ -5999,9 +6022,9 @@ void Storage::outELE()
 			logLine.append(buff);
 			logLine.append(LAYSTR + "]");
 			if (LAYSTR == "ACROSS")
-			_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Elems ( %9d Nodes)\n",std::stoi(nl_across.data())-1,std::stoi(nn_across.data())-2,NE, NN);
+			_snprintf(buff, sizeof(buff), "       (%9d)*(%9d) = %9d Elems ( %9d Nodes)\n",std::stoi(nl_across.data())-1,std::stoi(nn_across.data())-2,NE, NN);
 			else
-			_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Elems ( %9d Nodes)\n", std::stoi(nl_within.data())-1, std::stoi(nn_within.data())-2, NE, NN);
+			_snprintf(buff, sizeof(buff), "       (%9d)*(%9d) = %9d Elems ( %9d Nodes)\n", std::stoi(nl_within.data())-1, std::stoi(nn_within.data())-2, NE, NN);
 			logLine.append(buff);                               
 			logLine.append("## \n");
 		}
@@ -6250,9 +6273,9 @@ void Storage::outNOD()
 			logLine.append(buff);
 			logLine.append(LAYSTR + "]");
 			if (LAYSTR == "ACROSS")
-				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", std::stoi(nl_across.data()), std::stoi(nn_across.data()), NN, NE);
+				_snprintf(buff, sizeof(buff), "       (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", std::stoi(nl_across.data()), std::stoi(nn_across.data()), NN, NE);
 			else
-				_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", std::stoi(nl_within.data()), std::stoi(nn_within.data()), NN, NE);
+				_snprintf(buff, sizeof(buff), "       (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", std::stoi(nl_within.data()), std::stoi(nn_within.data()), NN, NE);
 			logLine.append(buff);                                    
 			logLine.append("## \n");
 		}
@@ -6334,16 +6357,198 @@ void Storage::outNOD()
 void Storage::outOBS()
 {
 	std::string logLine = "";
-	Writer * logWriter = Writer::instance("OBS");
+	//Writer * logWriter = Writer::instance("OBS");
 	char buff[512];
-	for (obsPoint obs : obsContainer)
-	{
-		std::cout << obs.get_x() << std::endl;
-		std::cout << obs.get_y() << std::endl;
-		std::cout << obs.get_z() << std::endl;
+	if (!onceOBS){
+		// FIRST CALL CREATE HEADERS
+		// IF NO OBS IS DEFINED WRITE MESSAGE AND RETURN
+		if (obsContainer.empty()){
+			logLine.append("## " + titles[0]+"\n");
+			logLine.append("## " + titles[1]+"\n");
+			logLine.append("##\n");
+			logLine.append("\n  *** NO OBSERVATION POINTS SPECIFIED (NOBS=0)");
+			std::string str = "";
+			str.append(InputFiles::instance()->getInputDirectory());
+			str.append(InputFiles::instance()->getFilesForWriting()["OBS"]);
+			Writer * wr = Writer::instance("OBS");
+			wr->set_filename(str);
+			wr->add_line(logLine);
+			onceOBS = true;
+			return;
+		} else
+		{
+			// WRITE HEADER INFORMATION
+			logLine.append("## " + titles[0] + "\n");
+			logLine.append("## " + titles[1] + "\n");
+			logLine.append("##\n");
+			std::string CTYPE2;
+			if (KTYPE[1] > 1){
 
-		std::cout << obs.get_element() << std::endl;
+				if (KTYPE[1] == 3) { CTYPE2 = "BLOCKWISE MESH"; }
+				else{ CTYPE2 = "REGULAR MESH"; }
+
+				if (KTYPE[0] == 3){ // 3D
+					_snprintf(buff, sizeof(buff), "## %1d-D, ", KTYPE[0]);
+					logLine.append(buff + CTYPE2);
+					_snprintf(buff, sizeof(buff), "  (%9d)*(%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NN1 - 1, NN2 - 1, NN3 - 1, NN, NE);
+					logLine.append(buff);
+					logLine.append("## \n");
+				}
+				else{ // 2D
+					_snprintf(buff, sizeof(buff), "## %1d-D, ", KTYPE[0]);
+					logLine.append(buff + CTYPE2);
+					_snprintf(buff, sizeof(buff), "  (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", NN1 - 1, NN2 - 1, NN, NE);
+					logLine.append(buff);
+					logLine.append("## \n");
+
+				}
+
+			}
+			else if (KTYPE[1] == 1){
+				_snprintf(buff, sizeof(buff), "## %1d-D, LAYERED MESH [", KTYPE[0]);
+				logLine.append(buff);
+				logLine.append(LAYSTR + "]");
+				if (LAYSTR == "ACROSS")
+					_snprintf(buff, sizeof(buff), "       (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", std::stoi(nl_across.data()) - 1, std::stoi(nn_across.data()) - 2, NN, NE);
+				else
+					_snprintf(buff, sizeof(buff), "       (%9d)*(%9d) = %9d Nodes ( %9d Elems)\n", std::stoi(nl_within.data()) - 1, std::stoi(nn_within.data()) - 2, NN, NE);
+				logLine.append(buff);
+				logLine.append("## \n");
+			}
+			else{
+				_snprintf(buff, sizeof(buff), "## %1d-D, IRREGULAR MESH", KTYPE[0]);
+				logLine.append(buff);
+				logLine.append(std::string(40, ' '));
+				_snprintf(buff, sizeof(buff), "%9d Nodes ( %9d Elems)\n", NN, NE);
+				logLine.append(buff);
+				logLine.append("## \n");
+			}
+
+			logLine.append("## " + std::string(92, '=') + "\n## OBSERVATION POINT RESULTS" + std::string(48, ' '));
+			int KTPRN = 3;
+			// First and Last Time Steps are always are included
+			// Others are decided on % OBS
+			std::vector<int> timeIndexes{0,1};
+			
+			for (int i = 2;i< schedule_list[time_steps_index]->get_step_list_size() - 1; i++)
+			{
+				if ((schedule_list[time_steps_index]->get_step_time()[i].first % NPCYC == 0) ||
+					BCSFL[i] || BCSTR[i])
+				{
+					KTPRN++;
+					timeIndexes.push_back(i);
+				}
+			}
+			timeIndexes.push_back(schedule_list[time_steps_index]->get_step_list_size() - 1);
+
+			_snprintf(buff, 1024, "%9d Time steps printed\n", KTPRN);
+			logLine.append(buff);
+			logLine.append("## " + std::string(92, '=') + "\n## \n");
+			logLine.append("##     Time steps" + std::string(29, ' ') + "[Latest time step computed]\n");
+			logLine.append("##    in this file      Time (sec)      Pressure         Conc.           Sat.       Eff.Str.       Str.Rat.\n");
+			logLine.append("##    ------------      ----------     ----------   ----------    -----------     ----------     ----------");
+			for (int t : timeIndexes)
+			{
+				_snprintf(buff, 1024, "\n## %15.5e   %+12.6e       %8d       %8d       %8d       %8d       %8d", (double)t, schedule_list[time_steps_index]->get_step_time()[t].second, t, t, t,t,t);
+				logLine.append(buff);
+			}
+			logLine.append("\n## \n");
+			logLine.append("## " + std::string(98, '=') + "\n## \n");
+			//Write obs Pt Names
+			logLine.append("##                                  ");
+			for (obsPoint obs : obsContainer)
+			{
+					int fil = (74 - obs.get_name().length())/2;
+					int rem = 74 - obs.get_name().length() - fil;
+					logLine.append(std::string(fil, ' ') + obs.get_name() + std::string(rem+5, ' '));
+			}
+			logLine.append("\n##                                  ");
+			for (obsPoint obs : obsContainer)
+			{
+				int fil =74;
+				
+				logLine.append(std::string(fil, '-') + "     ");
+			}
+			logLine.append("\n##                                  ");
+			for (obsPoint obs : obsContainer)
+			{
+				if (KTYPE[0]==3)
+					_snprintf(buff, 1024, "(%+13.8e,%+13.8e,%+13.8e)", obs.get_x(), obs.get_y(), obs.get_z());
+				else
+					_snprintf(buff, 1024, "(%+13.8e,%+13.8e)", obs.get_x(), obs.get_y());
+				std::string str= buff;
+				int fil = (74 - str.length()) / 2;
+				int rem = 74 - str.length() - fil;
+
+				logLine.append(std::string(fil, ' ') + str + std::string(rem + 5, ' '));
+
+			}
+			logLine.append("\n##                                  ");
+			for (obsPoint obs : obsContainer)
+			{
+				int fil = 74;
+
+				logLine.append(std::string(fil, '-') + "     ");
+			}
+
+			logLine.append("\n##       Time Step     Time(sec)    ");
+			for (int i = 0; i < obsContainer.size(); i++)
+				logLine.append("      Pressure  Concentration     Saturation     Eff.Stress     Stress.Rat     ");
+
+
+
+
+				std::string str = "";
+				str.append(InputFiles::instance()->getInputDirectory());
+				str.append(InputFiles::instance()->getFilesForWriting()["OBS"]);
+				Writer * writer = Writer::instance("OBS");
+				writer->set_filename(str);
+				//writer->set_newRun(true);
+				logLine.append("\n##" + std::string(34 + obsContainer.size() * 79 - 5, '-'));
+
+				_snprintf(buff, 1024, "\n##   %13.5e   %+12.6e ", (double)IT, TSEC);
+				logLine.append(buff);
+				for (obsPoint obs : obsContainer)
+				{
+					std::string dale = obs.get_name();
+					std::size_t pos = dale.find("_");
+					int val = std::stoi(dale.substr(pos + 1));
+					val = val - 1;
+					_snprintf(buff, 1024, "%+14.5e %+14.5e %+14.5e %+14.5e %+14.5e     ", node_pvec[val], node_uvec[val], node_swt[val], 0.0, 0.0);// , node_eff[], node_rat[]);
+					logLine.append(buff);
+				}
+
+				if (writer)
+				{
+					writer->add_line(logLine);
+				}
+			
+			logLine.clear();
+			onceOBS = true;
+			return;
+		}
+	} else
+	{
+		std::string str = "";
+		str.append(InputFiles::instance()->getInputDirectory());
+		str.append(InputFiles::instance()->getFilesForWriting()["OBS"]);
+		Writer * writer = Writer::instance("OBS");
+		writer->set_filename(str);
+		_snprintf(buff, 1024, "##   %13.5e   %+12.6e ", (double)IT, TSEC);
+		logLine.append(buff);
+		for (obsPoint obs : obsContainer)
+		{
+			std::string dale =obs.get_name();
+			std::size_t pos = dale.find("_");
+			int val = std::stoi(dale.substr(pos + 1));
+			val = val - 1;
+			_snprintf(buff, 1024, "%+14.5e %+14.5e %+14.5e %+14.5e %+14.5e     ", node_pvec[val], node_uvec[val], node_swt[val],0,0);// , node_eff[], node_rat[]);
+			logLine.append(buff);
+		}
+		writer->add_line(logLine);
 	}
+
+
 }
 
 /*	std::ofstream outbin("p_rhs.bin", std::ios::binary);

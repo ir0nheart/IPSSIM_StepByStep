@@ -8,8 +8,11 @@
 
 void main(int argc, _TCHAR* argv[])
 {
+	std::string dale = "N_123113";
+	std::size_t pos = dale.find("_");
+	int val = std::stoi( dale.substr(pos+1));
 
-
+		
 	std::thread simControl = std::thread(&SimulationControl::run, SimulationControl::instance());
 	std::thread lstwriter = std::thread(&Writer::run, Writer::instance("LST"));
 	std::thread nodwriter = std::thread(&Writer::run, Writer::instance("NOD"));
